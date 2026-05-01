@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowRight, Activity, CheckCircle, Circle } from "lucide-react";
+import { ArrowRight, Activity, CalendarDays, Droplet, Ruler, Weight, Phone, Mail, MapPin } from "lucide-react";
 import { Badge } from "../../../../components/ui/Badge";
 import { DemoNavbar } from "../../../../components/layout/DemoNavbar";
 import { PatientSidebar } from "../../../../components/patient/PatientSidebar";
@@ -18,74 +18,52 @@ interface UserProfile {
   bloodGroup?: string;
   height?: string;
   weight?: string;
+  phone?: string;
+  address?: string;
   conditions?: string[];
   medications?: string;
   allergies?: string;
 }
 
-interface HealthRecord {
-  date: string;
-  symptoms: string;
-  severity: string;
-  riskLevel: string;
-  aiSummary: string;
-  suggestions?: string[];
-}
-
 export default function PatientDashboardPage() {
   const router = useRouter();
-  const [user, setUser]             = useState<UserProfile | null>(null);
+  const [user, setUser] = useState<UserProfile | null>(null);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
-  const [history, setHistory]       = useState<HealthRecord[]>([]);
   const [loadingAppts, setLoadingAppts] = useState(false);
 
-  /* ── Load user from token via /api/auth/me ── */
   useEffect(() => {
     const token = typeof window !== "undefined" ? localStorage.getItem("mediflow_token") : null;
-
     if (!token) {
       router.replace("/demo/patient/auth");
       return;
     }
 
-    // Try to get profile from /api/auth/me; fallback to cached localStorage
     authApi.me()
       .then(res => {
         const merged = {
-          ...(typeof window !== "undefined"
-            ? (() => { try { return JSON.parse(localStorage.getItem("mediflow_user") || "{}"); } catch { return {}; } })()
-            : {}),
+          ...(typeof window !== "undefined" ? JSON.parse(localStorage.getItem("mediflow_user") || "{}") : {}),
           ...res.user,
         };
         setUser(merged);
-        // Also cache it locally for HealthChat
-        if (typeof window !== "undefined") {
-          localStorage.setItem("mediflow_user", JSON.stringify(merged));
-        }
+        if (typeof window !== "undefined") localStorage.setItem("mediflow_user", JSON.stringify(merged));
       })
       .catch(() => {
-        // Fallback: use whatever was cached
         try {
           const cached = localStorage.getItem("mediflow_user");
-          if (cached) {
-            setUser(JSON.parse(cached));
-          } else {
-            router.replace("/demo/patient/auth");
-          }
+          if (cached) setUser(JSON.parse(cached));
+          else router.replace("/demo/patient/auth");
         } catch {
           router.replace("/demo/patient/auth");
         }
       });
   }, [router]);
 
-  /* ── Load appointments from backend ── */
   const loadAppointments = async () => {
     setLoadingAppts(true);
     try {
       const res = await appointmentsApi.getAll();
       setAppointments(res.appointments || []);
     } catch {
-      // Fallback to localStorage appointments
       try {
         const stored = localStorage.getItem("mediflow_appointments");
         if (stored) setAppointments(JSON.parse(stored));
@@ -95,235 +73,184 @@ export default function PatientDashboardPage() {
     }
   };
 
-  /* ── Load health history from localStorage (written by HealthChat) ── */
-  const loadHistory = () => {
-    try {
-      const stored = localStorage.getItem("mediflow_health_history");
-      if (stored) setHistory(JSON.parse(stored));
-    } catch { /* ignore */ }
-  };
-
   useEffect(() => {
     if (!user) return;
     loadAppointments();
-    loadHistory();
-
     const onApptUpdate = () => loadAppointments();
-    const onHistUpdate = () => loadHistory();
     window.addEventListener("appointmentUpdated", onApptUpdate);
-    window.addEventListener("healthHistoryUpdated", onHistUpdate);
-    window.addEventListener("healthUpdated", onHistUpdate);
-    return () => {
-      window.removeEventListener("appointmentUpdated", onApptUpdate);
-      window.removeEventListener("healthHistoryUpdated", onHistUpdate);
-      window.removeEventListener("healthUpdated", onHistUpdate);
-    };
+    return () => window.removeEventListener("appointmentUpdated", onApptUpdate);
   }, [user]);
 
   if (!user) return null;
 
-  const upcoming = appointments
-    .filter(a => a.status === "upcoming" || a.status === "confirmed")
-    .slice(0, 3);
-  const latestAnalysis = history.length > 0 ? history[0] : null;
+  const upcoming = appointments.filter(a => a.status === "upcoming" || a.status === "confirmed").slice(0, 2);
 
   return (
     <>
       <DemoNavbar title="Patient Dashboard" />
-      <div className="flex min-h-screen bg-[#eef8fc]">
+      <div className="flex min-h-[calc(100vh-64px)] bg-[#F8FAFC]">
         <PatientSidebar
           activeTab="overview"
           onTabChange={() => {}}
           patientName={user.name}
           riskLabel="Active"
-          riskColor="bg-success/10 text-success border-success/30"
+          riskColor="bg-green-100 text-green-700 border-green-200"
         />
 
-        <main className="flex-1 p-6 lg:p-10 overflow-auto">
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <main className="flex-1 p-6 lg:p-8 overflow-auto">
+          <div className="max-w-[1600px] mx-auto grid grid-cols-1 xl:grid-cols-[1fr_500px] gap-8">
+            
+            {/* ─── LEFT COLUMN: Profile & Details ─── */}
+            <div className="flex flex-col gap-8">
+              
+              {/* Top Row: Quick Vitals Cards */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 animate-fadeUp">
+                <div className="bg-white rounded-2xl p-5 border border-[#E2E8F0] shadow-sm flex items-center gap-4">
+                  <div className="w-12 h-12 rounded-full bg-blue-50 flex items-center justify-center text-blue-600">
+                    <Droplet size={24} />
+                  </div>
+                  <div>
+                    <p className="text-[#64748B] text-xs font-bold uppercase tracking-wider">Blood Group</p>
+                    <p className="text-[#0F172A] font-bold text-xl">{user.bloodGroup || "O+"}</p>
+                  </div>
+                </div>
+                <div className="bg-white rounded-2xl p-5 border border-[#E2E8F0] shadow-sm flex items-center gap-4">
+                  <div className="w-12 h-12 rounded-full bg-indigo-50 flex items-center justify-center text-indigo-600">
+                    <CalendarDays size={24} />
+                  </div>
+                  <div>
+                    <p className="text-[#64748B] text-xs font-bold uppercase tracking-wider">Age / Gender</p>
+                    <p className="text-[#0F172A] font-bold text-xl">{user.age || "28"} {user.gender === 'M' ? 'M' : user.gender === 'F' ? 'F' : 'U'}</p>
+                  </div>
+                </div>
+                <div className="bg-white rounded-2xl p-5 border border-[#E2E8F0] shadow-sm flex items-center gap-4">
+                  <div className="w-12 h-12 rounded-full bg-emerald-50 flex items-center justify-center text-emerald-600">
+                    <Ruler size={24} />
+                  </div>
+                  <div>
+                    <p className="text-[#64748B] text-xs font-bold uppercase tracking-wider">Height</p>
+                    <p className="text-[#0F172A] font-bold text-xl">{user.height || "175"} <span className="text-sm font-medium text-[#64748B]">cm</span></p>
+                  </div>
+                </div>
+                <div className="bg-white rounded-2xl p-5 border border-[#E2E8F0] shadow-sm flex items-center gap-4">
+                  <div className="w-12 h-12 rounded-full bg-orange-50 flex items-center justify-center text-orange-600">
+                    <Weight size={24} />
+                  </div>
+                  <div>
+                    <p className="text-[#64748B] text-xs font-bold uppercase tracking-wider">Weight</p>
+                    <p className="text-[#0F172A] font-bold text-xl">{user.weight || "70"} <span className="text-sm font-medium text-[#64748B]">kg</span></p>
+                  </div>
+                </div>
+              </div>
 
-            {/* ─── LEFT COLUMN ─── */}
-            <div className="lg:col-span-1 space-y-8">
-
-              {/* Profile Card */}
-              <div className="animate-fadeUp">
-                <h2 className="font-display text-xl text-primary font-bold mb-4">Patient Profile</h2>
-                <div className="bg-white border-none shadow-md rounded-2xl p-6">
-                  <div className="space-y-5 text-base">
-                    <div className="grid grid-cols-2 gap-y-4">
+              {/* Main Profile Info */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8 animate-fadeUp" style={{ animationDelay: '100ms' }}>
+                
+                {/* Contact & Personal Details */}
+                <div className="bg-white rounded-2xl p-8 border border-[#E2E8F0] shadow-sm flex flex-col">
+                  <h3 className="text-[#0F172A] text-lg font-bold mb-6 flex items-center gap-2">
+                    <Activity className="text-[#1B4965]" /> Personal Information
+                  </h3>
+                  <div className="space-y-6 flex-1">
+                    <div className="flex items-start gap-4">
+                      <Mail className="text-[#94A3B8] mt-1" size={20} />
                       <div>
-                        <span className="text-primary/50 text-xs block uppercase tracking-wider font-bold mb-1">Name</span>
-                        <span className="font-bold text-primary text-lg">{user.name}</span>
-                      </div>
-                      <div>
-                        <span className="text-primary/50 text-xs block uppercase tracking-wider font-bold mb-1">Age / Gender</span>
-                        <span className="font-bold text-primary text-lg">
-                          {user.age ? `${user.age}, ` : ""}{user.gender || "—"}
-                        </span>
-                      </div>
-                      <div>
-                        <span className="text-primary/50 text-xs block uppercase tracking-wider font-bold mb-1">Blood Group</span>
-                        <span className="font-bold text-primary text-lg">{user.bloodGroup || "—"}</span>
-                      </div>
-                      <div>
-                        <span className="text-primary/50 text-xs block uppercase tracking-wider font-bold mb-1">Vitals</span>
-                        <span className="font-bold text-primary text-lg">
-                          {user.height ? `${user.height}cm` : "—"}{user.weight ? `, ${user.weight}kg` : ""}
-                        </span>
+                        <p className="text-[#64748B] text-xs font-bold uppercase tracking-wider">Email Address</p>
+                        <p className="text-[#0F172A] font-medium">{user.email}</p>
                       </div>
                     </div>
-                    <div className="border-t border-bgSoft pt-4">
-                      <span className="text-primary/50 text-xs block uppercase tracking-wider font-bold mb-2">Conditions</span>
-                      <div className="flex flex-wrap gap-2">
-                        {user.conditions && user.conditions.length > 0
-                          ? user.conditions.map(c => <Badge key={c} variant="normal" size="md">{c}</Badge>)
-                          : <span className="text-primary/70 font-medium text-lg">None</span>}
+                    <div className="flex items-start gap-4">
+                      <Phone className="text-[#94A3B8] mt-1" size={20} />
+                      <div>
+                        <p className="text-[#64748B] text-xs font-bold uppercase tracking-wider">Phone Number</p>
+                        <p className="text-[#0F172A] font-medium">{user.phone || "+1 (555) 000-0000"}</p>
                       </div>
                     </div>
-                    <div>
-                      <span className="text-primary/50 text-xs block uppercase tracking-wider font-bold mb-1">Medications</span>
-                      <span className="font-bold text-primary text-lg">{user.medications || "None"}</span>
-                    </div>
-                    <div>
-                      <span className="text-primary/50 text-xs block uppercase tracking-wider font-bold mb-1">Allergies</span>
-                      <span className="font-bold text-primary text-lg">{user.allergies || "None"}</span>
+                    <div className="flex items-start gap-4">
+                      <MapPin className="text-[#94A3B8] mt-1" size={20} />
+                      <div>
+                        <p className="text-[#64748B] text-xs font-bold uppercase tracking-wider">Address</p>
+                        <p className="text-[#0F172A] font-medium">{user.address || "123 Medical Drive, Health City, NY 10001"}</p>
+                      </div>
                     </div>
                   </div>
                 </div>
+
+                {/* Medical History */}
+                <div className="bg-white rounded-2xl p-8 border border-[#E2E8F0] shadow-sm flex flex-col">
+                  <h3 className="text-[#0F172A] text-lg font-bold mb-6">Medical History</h3>
+                  <div className="space-y-6 flex-1">
+                    <div>
+                      <p className="text-[#64748B] text-xs font-bold uppercase tracking-wider mb-2">Chronic Conditions</p>
+                      <div className="flex flex-wrap gap-2">
+                        {user.conditions && user.conditions.length > 0 ? (
+                          user.conditions.map(c => (
+                            <span key={c} className="bg-rose-50 text-rose-700 border border-rose-200 px-3 py-1 rounded-full text-sm font-semibold">
+                              {c}
+                            </span>
+                          ))
+                        ) : (
+                          <span className="text-[#64748B] text-sm">None recorded</span>
+                        )}
+                      </div>
+                    </div>
+                    <div>
+                      <p className="text-[#64748B] text-xs font-bold uppercase tracking-wider mb-2">Current Medications</p>
+                      <p className="text-[#0F172A] font-medium bg-[#F8FAFC] p-3 rounded-lg border border-[#E2E8F0]">
+                        {user.medications || "None"}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-[#64748B] text-xs font-bold uppercase tracking-wider mb-2">Known Allergies</p>
+                      <p className="text-[#0F172A] font-medium bg-[#F8FAFC] p-3 rounded-lg border border-[#E2E8F0]">
+                        {user.allergies || "None"}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
               </div>
 
               {/* Upcoming Appointments */}
-              <div id="appointments-section" className="animate-fadeUp flex flex-col">
-                <h2 className="font-display text-xl text-primary font-bold mb-4">Upcoming Appointments</h2>
-                <div className="bg-white border-none shadow-md rounded-2xl p-6 flex-1 flex flex-col">
-                  {loadingAppts ? (
-                    <div className="flex-1 flex items-center justify-center">
-                      <span className="text-primary/40 text-sm">Loading appointments…</span>
-                    </div>
-                  ) : upcoming.length > 0 ? (
-                    <div className="space-y-3 flex-1">
-                      {upcoming.map((apt, i) => (
-                        <div key={apt._id || i} className="flex justify-between items-center bg-bgLight/50 p-4 rounded-xl border border-bgSoft hover:bg-bgLight transition-colors">
-                          <div>
-                            <p className="font-bold text-primary text-base">{apt.doctorName || "Doctor"}</p>
-                            <p className="text-sm text-primary/70 mt-1">
-                              {apt.specialization ? `${apt.specialization} · ` : ""}
-                              {apt.dateTime
-                                ? new Date(apt.dateTime).toLocaleDateString()
-                                : "Date TBD"}
-                            </p>
-                          </div>
-                          <Badge variant="success" size="md">Confirmed</Badge>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="flex-1 flex items-center justify-center bg-bgLight/50 border border-bgSoft rounded-xl p-6 text-center">
-                      <p className="text-base font-semibold text-primary/60">No upcoming appointments</p>
-                    </div>
-                  )}
-                  <button
-                    onClick={() => router.push("/demo/patient/appointments")}
-                    className="mt-5 text-sm font-bold text-accent hover:text-primary transition-colors flex items-center justify-center gap-1 w-full bg-accent/5 py-2.5 rounded-xl"
-                  >
-                    View All Appointments <ArrowRight size={16} />
+              <div className="bg-white rounded-2xl p-8 border border-[#E2E8F0] shadow-sm animate-fadeUp" style={{ animationDelay: '200ms' }}>
+                <div className="flex justify-between items-center mb-6">
+                  <h3 className="text-[#0F172A] text-lg font-bold">Upcoming Appointments</h3>
+                  <button onClick={() => router.push("/demo/patient/appointments")} className="text-[#1B4965] font-semibold text-sm hover:underline">
+                    View All
                   </button>
                 </div>
+                
+                {loadingAppts ? (
+                  <p className="text-[#64748B] py-4">Loading...</p>
+                ) : upcoming.length > 0 ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {upcoming.map((apt, i) => (
+                      <div key={apt._id || i} className="flex flex-col gap-3 p-4 rounded-xl border border-[#E2E8F0] bg-[#F8FAFC] hover:shadow-md transition-shadow">
+                        <div className="flex justify-between items-start">
+                          <h4 className="font-bold text-[#0F172A] text-lg">{apt.doctorName || "Doctor"}</h4>
+                          <span className="bg-emerald-100 text-emerald-700 text-xs font-bold px-2 py-1 rounded-md">Confirmed</span>
+                        </div>
+                        <p className="text-[#64748B] text-sm">{apt.specialization}</p>
+                        <div className="mt-2 pt-3 border-t border-[#E2E8F0] flex items-center gap-2 text-[#0F172A] font-medium text-sm">
+                          <CalendarDays size={16} className="text-[#94A3B8]" />
+                          {apt.dateTime ? new Date(apt.dateTime).toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }) : "Date TBD"}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-8 bg-[#F8FAFC] rounded-xl border border-dashed border-[#CBD5E1]">
+                    <p className="text-[#64748B] font-medium">No upcoming appointments</p>
+                  </div>
+                )}
               </div>
             </div>
 
-            {/* ─── RIGHT COLUMN ─── */}
-            <div className="lg:col-span-2 flex flex-col gap-8">
-              <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
-
-                {/* Clinical Triage Chat */}
-                <div className="flex flex-col animate-fadeUp" id="chat-section">
-                  <h2 className="font-display text-xl text-primary font-bold mb-4">Clinical Triage Chat</h2>
-                  <div className="bg-[#f0f7fb] border border-bgSoft rounded-2xl overflow-hidden shadow-md h-[450px] relative [&>div]:h-full">
-                    <HealthChat />
-                  </div>
-                </div>
-
-                {/* Agentic Intelligence Breakdown */}
-                <div id="ai-analysis-section" className="animate-fadeUp flex flex-col">
-                  <h2 className="font-display text-xl text-primary font-bold mb-4">Agentic Intelligence Breakdown</h2>
-                  <div className="bg-white border-none shadow-md rounded-2xl p-6 flex-1 flex flex-col">
-                    <div className="flex items-center gap-3 mb-6">
-                      <Activity size={24} className="text-accent" />
-                      <h3 className="font-display text-lg font-bold text-primary">Agent Thinking</h3>
-                    </div>
-
-                    {latestAnalysis ? (
-                      <div className="space-y-4 flex-1">
-                        <div className="flex items-center gap-3 bg-success/10 px-4 py-3 rounded-xl border border-success/20">
-                          <CheckCircle size={18} className="text-success" />
-                          <span className="font-semibold text-primary text-[15px]">Analyzing symptoms</span>
-                        </div>
-                        <div className="flex items-center gap-3 bg-success/10 px-4 py-3 rounded-xl border border-success/20">
-                          <CheckCircle size={18} className="text-success" />
-                          <span className="font-semibold text-primary text-[15px]">Asking follow-ups</span>
-                        </div>
-                        <div className="flex items-center justify-between bg-accent/10 px-4 py-3 rounded-xl border border-accent/20">
-                          <div className="flex items-center gap-3">
-                            <CheckCircle size={18} className="text-accent" />
-                            <span className="font-semibold text-primary text-[15px]">Evaluating urgency</span>
-                          </div>
-                          <Badge
-                            variant={
-                              latestAnalysis.riskLevel?.toLowerCase().includes("high") ? "emergency"
-                              : latestAnalysis.riskLevel?.toLowerCase().includes("moderate") ? "warning"
-                              : "success"
-                            }
-                            size="sm"
-                          >
-                            {latestAnalysis.riskLevel || "Analyzed"}
-                          </Badge>
-                        </div>
-                        <div className="flex flex-col gap-2 bg-bgLight/50 px-4 py-3 rounded-xl border border-bgSoft">
-                          <div className="flex items-center gap-3">
-                            <CheckCircle size={18} className="text-primary/50" />
-                            <span className="font-semibold text-primary text-[15px]">Recommended Action</span>
-                          </div>
-                          <p className="text-[14px] text-primary/70 ml-8 font-medium">
-                            {latestAnalysis.suggestions?.[0] || "Consult a specialist based on symptoms."}
-                          </p>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="space-y-4 flex-1">
-                        <div className="flex items-center gap-3 bg-success/10 px-4 py-3 rounded-xl border border-success/20">
-                          <CheckCircle size={18} className="text-success" />
-                          <span className="font-semibold text-primary text-[15px]">Analyzing symptoms</span>
-                        </div>
-                        <div className="flex items-center gap-3 bg-success/10 px-4 py-3 rounded-xl border border-success/20">
-                          <CheckCircle size={18} className="text-success" />
-                          <span className="font-semibold text-primary text-[15px]">Asking follow-ups</span>
-                        </div>
-                        <div className="flex items-center justify-between bg-accent/10 px-4 py-3 rounded-xl border border-accent/20">
-                          <div className="flex items-center gap-3">
-                            <ArrowRight size={18} className="text-accent" />
-                            <span className="font-semibold text-primary text-[15px]">Evaluating urgency</span>
-                          </div>
-                          <span className="text-[11px] font-bold text-accent uppercase tracking-wider bg-accent/20 px-2 py-1 rounded-md border border-accent/30">
-                            in progress
-                          </span>
-                        </div>
-                        <div className="flex items-center justify-between bg-bgLight/50 px-4 py-3 rounded-xl border border-bgSoft">
-                          <div className="flex items-center gap-3">
-                            <Circle size={18} className="text-primary/30" />
-                            <span className="font-semibold text-primary/70 text-[15px]">Deciding next action</span>
-                          </div>
-                          <span className="text-[11px] font-bold text-primary/40 uppercase tracking-wider bg-white px-2 py-1 rounded-md border border-bgSoft">
-                            pending
-                          </span>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-              </div>
+            {/* ─── RIGHT COLUMN: WhatsApp Triage Chat ─── */}
+            <div className="h-[calc(100vh-130px)] flex flex-col bg-white rounded-2xl border border-[#E2E8F0] shadow-lg overflow-hidden animate-fadeUp" style={{ animationDelay: '300ms' }}>
+              <HealthChat />
             </div>
+
           </div>
         </main>
       </div>
