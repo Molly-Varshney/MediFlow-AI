@@ -22,7 +22,6 @@ export const DemoNavbar: React.FC<DemoNavbarProps> = ({
   totalSteps,
 }) => {
   const router = useRouter();
-  const sessionId = useMediFlowStore((state) => state.sessionId);
 
   const handleBack = () => {
     if (backHref) {
@@ -64,12 +63,6 @@ export const DemoNavbar: React.FC<DemoNavbarProps> = ({
             <HeartPulse size={13} />
             Health Check
           </button>
-          <div className="bg-bgLight px-3 py-1 rounded-full flex items-center gap-1.5">
-            <span className="w-1.5 h-1.5 bg-success rounded-full animate-pulse" />
-            <span className="text-primary/50 text-xs font-mono font-medium">
-              ID: {sessionId.substring(0, 6)}
-            </span>
-          </div>
         </div>
       </div>
 

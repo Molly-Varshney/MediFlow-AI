@@ -69,7 +69,7 @@ function HeroSection() {
               Advancing
             </span>
             <span className="text-accent block">Clinical</span>
-            <span className="text-primary dark:text-white block">
+            <span className="text-primwhary dark:text-white block">
               Superintelligence
             </span>
           </h1>
@@ -196,9 +196,9 @@ function HeroSection() {
             <div className="relative flex justify-between items-center w-full">
               {/* Connecting line background */}
               <div className="absolute top-6 left-0 w-full h-0.5 bg-bgSoft dark:bg-white/10 -z-10" />
-              
+
               {/* Active progress line */}
-              <div 
+              <div
                 className="absolute top-6 left-0 h-0.5 bg-accent transition-all duration-500 ease-in-out -z-10"
                 style={{ width: `${(activeTimelineStep / (timelineSteps.length - 1)) * 100}%` }}
               />
@@ -212,28 +212,25 @@ function HeroSection() {
                   <div key={step.label} className="flex flex-col items-center gap-3 bg-transparent">
                     <div
                       className={`w-10 h-10 sm:w-12 sm:h-12 rounded-full flex items-center justify-center transition-all duration-300 border-2
-                        ${
-                          isActive
-                            ? "border-accent bg-accent/10 dark:bg-accent/20"
-                            : "border-bgSoft dark:border-white/20 bg-white dark:bg-[#163248]"
+                        ${isActive
+                          ? "border-accent bg-accent/10 dark:bg-accent/20"
+                          : "border-bgSoft dark:border-white/20 bg-white dark:bg-[#163248]"
                         }
                         ${isCurrent ? "glow-active scale-110" : "scale-100"}
                       `}
                     >
                       <Icon
-                        className={`w-4 h-4 sm:w-5 sm:h-5 transition-colors duration-300 ${
-                          isActive
+                        className={`w-4 h-4 sm:w-5 sm:h-5 transition-colors duration-300 ${isActive
                             ? "text-accent"
                             : "text-primary/40 dark:text-white/30"
-                        }`}
+                          }`}
                       />
                     </div>
                     <span
-                      className={`text-[10px] sm:text-xs font-semibold tracking-wide transition-colors duration-300 ${
-                        isCurrent
+                      className={`text-[10px] sm:text-xs font-semibold tracking-wide transition-colors duration-300 ${isCurrent
                           ? "text-primary dark:text-white"
                           : "text-primary/50 dark:text-white/50"
-                      }`}
+                        }`}
                     >
                       {step.label}
                     </span>
@@ -241,11 +238,11 @@ function HeroSection() {
                 );
               })}
             </div>
-            
+
             <div className="mt-8 text-center">
               <button className="inline-flex items-center gap-2 px-5 py-2 rounded-full border border-bgSoft dark:border-white/20 bg-white/50 dark:bg-white/5 text-sm font-medium text-primary dark:text-white hover:bg-bgSoft/50 dark:hover:bg-white/10 transition-colors backdrop-blur-sm">
-                 <MessageSquare className="w-4 h-4 text-accent" />
-                 AI Chat & Triage
+                <MessageSquare className="w-4 h-4 text-accent" />
+                AI Chat & Triage
               </button>
             </div>
           </div>
@@ -339,9 +336,8 @@ function HowItWorksSection() {
                     dark:bg-white/10 dark:border-accent/40`}
                 >
                   <Icon
-                    className={`w-6 h-6 ${
-                      i === 1 ? "text-accent" : i === 2 ? "text-warning" : i === 4 ? "text-success" : "text-primary dark:text-white"
-                    }`}
+                    className={`w-6 h-6 ${i === 1 ? "text-accent" : i === 2 ? "text-warning" : i === 4 ? "text-success" : "text-primary dark:text-white"
+                      }`}
                   />
                 </div>
                 <p className="text-sm font-semibold font-display leading-tight text-primary dark:text-white">
