@@ -1,388 +1,435 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
-import { Send, Bot, RotateCcw, CheckCircle, ArrowRight, Activity, Calendar } from "lucide-react";
+import { Send, Bot, RotateCcw, AlertCircle, CheckCircle2, Activity, Calendar } from "lucide-react";
+import { triageApi, doctorsApi, appointmentsApi, type AgentResult, type Doctor } from "@/lib/api";
 
 /* ─── Types ── */
 interface Message { role: "ai" | "user"; text: string; }
-interface Doctor { name: string; spec: string; availability: string; fee: string; location: string; rating: string; }
-interface Assessment { riskLevel: string; aiSummary: string; suggestions: string[]; severity?: string; }
 
-/* ─── Fallback logic ── */
-const FALLBACK_QUESTIONS = [
-  "How long have you been experiencing this?",
-  "Rate severity 1–10?",
-  "Any medications taken so far?",
-  "Any known allergies or conditions?"
-];
+type Phase =
+  | "chat"         // active Q&A with backend
+  | "result"       // triage + decision displayed
+  | "doctors"      // recommended doctors shown
+  | "booked"       // appointment confirmed
+  | "error";       // unrecoverable error
 
-const WELLNESS_QUESTIONS = [
-  "How has your sleep been lately?",
-  "How would you rate your energy levels and diet this week?",
-  "Any stress, anxiety, or anything on your mind?"
-];
-
-/* ─── Helpers ── */
-function matchSpec(text: string): string {
-  const t = text.toLowerCase();
-  if (/chest|heart|palpitation/.test(t)) return "Cardiologist";
-  if (/head|migraine|dizzy/.test(t)) return "Neurologist";
-  if (/skin|rash|acne|itch/.test(t)) return "Dermatologist";
-  if (/stomach|abdomen|nausea/.test(t)) return "Gastroenterologist";
-  if (/bone|joint|back|muscle/.test(t)) return "Orthopedic Specialist";
-  if (/mental|anxiety|stress|sleep/.test(t)) return "Psychiatrist";
-  if (/eye|vision|sight/.test(t)) return "Ophthalmologist";
-  if (/ear|nose|throat|sinus/.test(t)) return "ENT Specialist";
-  return "General Physician";
-}
-
-const DOCTOR_DB: Record<string, Doctor[]> = {
-  "Cardiologist":        [{ name:"Dr. Arvind Kapoor",      spec:"Cardiologist",        availability:"Available Today",         fee:"₹800", location:"Apollo Heart Centre, Bandra",          rating:"⭐ 4.8" },{ name:"Dr. Meena Nair",         spec:"Cardiologist",        availability:"Next Available: Tomorrow",     fee:"₹500", location:"Fortis Cardiac, Koregaon Park",        rating:"⭐ 4.6" },{ name:"Dr. Ramesh Iyer",        spec:"Cardiologist",        availability:"Available in 2 days",         fee:"₹300", location:"City Hospital, Connaught Place",       rating:"⭐ 4.5" }],
-  "Neurologist":         [{ name:"Dr. Priya Sharma",       spec:"Neurologist",         availability:"Available Today",         fee:"₹500", location:"Max Neuro Centre, Saket",             rating:"⭐ 4.7" },{ name:"Dr. Suresh Patil",       spec:"Neurologist",         availability:"Next Available: Tomorrow",     fee:"₹800", location:"Apollo Neuro, Jubilee Hills",          rating:"⭐ 4.9" },{ name:"Dr. Kavita Rao",         spec:"Neurologist",         availability:"Available in 2 days",         fee:"₹300", location:"Medanta Brain, Gurugram",             rating:"⭐ 4.5" }],
-  "Dermatologist":       [{ name:"Dr. Ananya Mehta",       spec:"Dermatologist",       availability:"Available Today",         fee:"₹300", location:"SkinCare Clinic, Indiranagar",        rating:"⭐ 4.6" },{ name:"Dr. Vikram Shah",        spec:"Dermatologist",       availability:"Next Available: Tomorrow",     fee:"₹500", location:"DermaCare, Linking Road",             rating:"⭐ 4.7" },{ name:"Dr. Pooja Gupta",        spec:"Dermatologist",       availability:"Available in 2 days",         fee:"₹800", location:"Apollo Skin, Anna Nagar",             rating:"⭐ 4.8" }],
-  "Gastroenterologist":  [{ name:"Dr. Karan Bose",         spec:"Gastroenterologist",  availability:"Available Today",         fee:"₹500", location:"GI Clinic, Salt Lake City",          rating:"⭐ 4.7" },{ name:"Dr. Sunita Verma",       spec:"Gastroenterologist",  availability:"Next Available: Tomorrow",     fee:"₹800", location:"Fortis GI, Mulund",                   rating:"⭐ 4.6" },{ name:"Dr. Raju Krishnan",      spec:"Gastroenterologist",  availability:"Available in 2 days",         fee:"₹300", location:"City GI Hospital, T. Nagar",          rating:"⭐ 4.5" }],
-  "Orthopedic Specialist":[{ name:"Dr. Anil Mathur",       spec:"Orthopedic Specialist",availability:"Available Today",        fee:"₹500", location:"Bone & Joint Clinic, Punjabi Bagh",  rating:"⭐ 4.8" },{ name:"Dr. Deepa Joshi",        spec:"Orthopedic Specialist",availability:"Next Available: Tomorrow",    fee:"₹300", location:"OrthoMax, FC Road",                   rating:"⭐ 4.6" },{ name:"Dr. Rajesh Tiwari",      spec:"Orthopedic Specialist",availability:"Available in 2 days",        fee:"₹800", location:"Apollo Ortho, Jubilee Hills",         rating:"⭐ 4.7" }],
-  "Psychiatrist":        [{ name:"Dr. Nidhi Arora",        spec:"Psychiatrist",        availability:"Available Today",         fee:"₹800", location:"MindCare Centre, Banjara Hills",      rating:"⭐ 4.9" },{ name:"Dr. Sameer Kulkarni",    spec:"Psychiatrist",        availability:"Next Available: Tomorrow",     fee:"₹500", location:"Wellness Clinic, Koramangala",        rating:"⭐ 4.7" },{ name:"Dr. Asha Singh",         spec:"Psychiatrist",        availability:"Available in 2 days",         fee:"₹300", location:"NeuroMind, Connaught Place",          rating:"⭐ 4.6" }],
-  "General Physician":   [{ name:"Dr. Rajiv Malhotra",     spec:"General Physician",   availability:"Available Today",         fee:"₹300", location:"Family Care Clinic, Sector 15",      rating:"⭐ 4.6" },{ name:"Dr. Usha Krishnamurthy", spec:"General Physician",   availability:"Next Available: Tomorrow",     fee:"₹500", location:"HealthFirst, Koramangala",           rating:"⭐ 4.7" },{ name:"Dr. Pawan Khanna",       spec:"General Physician",   availability:"Available in 2 days",         fee:"₹800", location:"Apollo Clinic, Bandra",              rating:"⭐ 4.8" }],
-};
-
-function getWellnessTips(symptom: string): string[] {
-  return ["Drink 8+ glasses of water daily", "Get 7–8 hours of quality sleep", "Incorporate light stretching or walking", "Maintain a balanced, nutritious diet"];
-}
-
-function randomTime(): string {
-  const h = [10,11,12,14,15,16,17,18][Math.floor(Math.random()*8)];
-  const m = Math.random()>0.5?"00":"30";
-  return `${h>12?h-12:h}:${m} ${h<12?"AM":"PM"}`;
+/* ─── Risk level helper ── */
+function riskColor(risk: string): string {
+  const r = risk?.toLowerCase() || "";
+  if (r.includes("high") || r.includes("emergency") || r.includes("critical"))
+    return "text-red-600 bg-red-50 border-red-200";
+  if (r.includes("moderate") || r.includes("medium"))
+    return "text-yellow-600 bg-yellow-50 border-yellow-200";
+  return "text-green-600 bg-green-50 border-green-200";
 }
 
 export default function HealthChat() {
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [input, setInput] = useState("");
-  const [typing, setTyping] = useState(false);
-  
-  // States
-  const [convHist, setConvHist] = useState<{role:string;content:string}[]>([]);
-  const [answers, setAnswers] = useState<string[]>([]);
-  const [assessment, setAssessment] = useState<Assessment | null>(null);
-  
-  // Phase tracking
-  const [phase, setPhase] = useState<"chat"|"flowchart"|"options"|"doctors"|"tips"|"booked">("chat");
-  const [bookingDoc, setBookingDoc] = useState<Doctor|null>(null);
-  const [isBooking, setIsBooking] = useState(false);
-  
-  // Modes
-  const [useFallback, setFallback] = useState(false);
-  const [wellnessMode, setWellnessMode] = useState(false);
-  const [qIndex, setQIndex] = useState(0); // for fallback/wellness
-  
+  const [messages, setMessages]     = useState<Message[]>([]);
+  const [input, setInput]           = useState("");
+  const [typing, setTyping]         = useState(false);
+  const [phase, setPhase]           = useState<Phase>("chat");
+
+  // Triage state
+  const [sessionId, setSessionId]   = useState<string | null>(null);
+  const [agentResult, setAgentResult] = useState<AgentResult | null>(null);
+  const [doctors, setDoctors]       = useState<Doctor[]>([]);
+  const [bookingDoc, setBookingDoc] = useState<Doctor | null>(null);
+  const [bookingLoading, setBookingLoading] = useState(false);
+  const [errorMsg, setErrorMsg]     = useState("");
+
+  // Track whether the very first user message has been sent
+  const isFirstMessage = useRef(true);
+
   const bottomRef = useRef<HTMLDivElement>(null);
 
-  const user = typeof window !== "undefined" ? JSON.parse(localStorage.getItem("mediflow_user") || "{}") : {};
-  const userName = user?.name || "there";
+  const user =
+    typeof window !== "undefined"
+      ? (() => { try { return JSON.parse(localStorage.getItem("mediflow_user") || "{}"); } catch { return {}; } })()
+      : {};
+  const userName: string = user?.name || "there";
 
+  /* ─── Initial greeting ── */
   useEffect(() => {
     setTyping(true);
     const t = setTimeout(() => {
       setTyping(false);
-      const firstQ = `Hi ${userName}! 👋 I'm your MediFlow AI health assistant. Tell me — what's bothering you today, or how are you feeling overall?`;
-      setMessages([{ role:"ai", text:firstQ }]);
-      setConvHist([{ role:"assistant", content:firstQ }]);
-    }, 900);
+      pushAI(
+        `Hi ${userName}! 👋 I'm MediFlow AI. Tell me — what symptoms are you experiencing today?`
+      );
+    }, 800);
     return () => clearTimeout(t);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userName]);
 
-  useEffect(() => { bottomRef.current?.scrollIntoView({ behavior:"smooth" }); }, [messages, typing, phase, bookingDoc]);
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages, typing, phase, doctors]);
 
-  /* ─── Save History ── */
-  const saveToHistory = (ast: Assessment) => {
-    try {
-      const key = "mediflow_health_history";
-      const prev = JSON.parse(localStorage.getItem(key) || "[]");
-      prev.unshift({
-        id: Date.now(),
-        date: new Date().toISOString(),
-        symptoms: answers[0] || "General checkup",
-        severity: ast.severity || "Mild",
-        riskLevel: ast.riskLevel,
-        aiSummary: ast.aiSummary,
-        suggestions: ast.suggestions || getWellnessTips("")
-      });
-      localStorage.setItem(key, JSON.stringify(prev));
-      window.dispatchEvent(new Event("healthHistoryUpdated"));
-    } catch {}
-  };
+  /* ─── Message helpers ── */
+  function pushAI(text: string) {
+    setMessages(p => [...p, { role: "ai", text }]);
+  }
+  function pushUser(text: string) {
+    setMessages(p => [...p, { role: "user", text }]);
+  }
 
-  /* ─── Message Handler ── */
+  /* ─── Handle send ── */
   const handleSend = async () => {
     const val = input.trim();
-    if (!val || typing) return;
+    if (!val || typing || phase !== "chat") return;
     setInput("");
-    
-    setMessages(p => [...p, { role:"user", text:val }]);
-    const newAnswers = [...answers, val];
-    setAnswers(newAnswers);
-    const newHist = [...convHist, { role:"user", content:val }];
-    setConvHist(newHist);
+    pushUser(val);
     setTyping(true);
 
-    // 1. Check if first message is "healthy"
-    if (newAnswers.length === 1 && /fine|good|healthy|great|well|no issue|nothing|okay|normal/i.test(val)) {
-      setWellnessMode(true);
-      setTimeout(() => {
-        setTyping(false);
-        setMessages(p => [...p, { role:"ai", text:"That's wonderful to hear! 😊 Let me do a quick wellness check to make sure everything is in order.\n\n" + WELLNESS_QUESTIONS[0] }]);
-      }, 1000);
-      return;
-    }
-
-    // 2. If in wellness mode
-    if (wellnessMode) {
-      const next = qIndex + 1;
-      if (next < WELLNESS_QUESTIONS.length) {
-        setQIndex(next);
-        setTimeout(() => { setTyping(false); setMessages(p => [...p, { role:"ai", text:WELLNESS_QUESTIONS[next] }]); }, 1000);
-      } else {
-        setTimeout(() => {
-          setTyping(false);
-          const ast = {
-            riskLevel: "Low Risk",
-            aiSummary: "You appear to be in good health. Keep up your healthy habits!",
-            suggestions: ["Stay hydrated", "Maintain regular sleep schedule", "Light exercise daily", "Regular health checkups"],
-            severity: "None"
-          };
-          setAssessment(ast);
-          saveToHistory(ast);
-          setPhase("flowchart");
-        }, 1500);
-      }
-      return;
-    }
-
-    // 3. Fallback flow
-    if (useFallback) {
-      const next = qIndex + 1;
-      if (next < FALLBACK_QUESTIONS.length) {
-        setQIndex(next);
-        setTimeout(() => { setTyping(false); setMessages(p => [...p, { role:"ai", text:FALLBACK_QUESTIONS[next] }]); }, 1000);
-      } else {
-        setTimeout(() => {
-          setTyping(false);
-          const ast = {
-            riskLevel: "Moderate Risk",
-            aiSummary: "Based on your symptoms, this requires basic medical attention but doesn't seem like an emergency.",
-            suggestions: ["Rest", "Hydrate", "Consult a doctor if it worsens"],
-            severity: "Moderate"
-          };
-          setAssessment(ast);
-          saveToHistory(ast);
-          setPhase("flowchart");
-        }, 1500);
-      }
-      return;
-    }
-
-    // 4. API flow
     try {
-      const res = await fetch("http://localhost:5000/api/triage/chat", {
-        method:"POST", headers:{"Content-Type":"application/json"},
-        body: JSON.stringify({ userMessage:val, conversationHistory:newHist, patientProfile:user }),
-        signal: AbortSignal.timeout(6000),
-      });
-      if (!res.ok) throw new Error("bad response");
-      const data = await res.json();
-      setTyping(false);
-      setMessages(p => [...p, { role:"ai", text:data.aiMessage }]);
-      setConvHist(p => [...p, { role:"assistant", content:data.aiMessage }]);
-      
-      if (data.isComplete) {
-        const ast = data.assessment || { riskLevel:"Moderate Risk", aiSummary:data.aiMessage, suggestions:["Rest","Hydrate"], severity:"Moderate" };
-        setAssessment(ast);
-        saveToHistory(ast);
-        setPhase("flowchart");
-      }
-    } catch {
-      // Switch to fallback on fail
-      setFallback(true);
-      setQIndex(0);
-      setTimeout(() => {
+      if (isFirstMessage.current) {
+        // ── START new triage session ──
+        isFirstMessage.current = false;
+        const res = await triageApi.start({
+          symptoms: val,
+          patientName: userName,
+        });
+
+        setSessionId(res.sessionId);
         setTyping(false);
-        setMessages(p => [...p, { role:"ai", text:FALLBACK_QUESTIONS[0] }]);
-      }, 500);
+
+        if (res.agentResult.done) {
+          // Rare: agent resolved in one shot
+          handleDone(res.agentResult);
+        } else {
+          pushAI(res.agentResult.nextQuestion || "Tell me more about your symptoms.");
+        }
+      } else {
+        // ── RESPOND to next question ──
+        if (!sessionId) throw new Error("Session not initialised");
+        const res = await triageApi.respond({ sessionId, answer: val });
+        setTyping(false);
+
+        if (res.agentResult.done) {
+          handleDone(res.agentResult);
+        } else {
+          pushAI(res.agentResult.nextQuestion || "Please continue...");
+        }
+      }
+    } catch (err: unknown) {
+      setTyping(false);
+      const msg = err instanceof Error ? err.message : "Unknown error";
+      setErrorMsg(`Could not reach backend: ${msg}. Make sure your server is running on http://localhost:5000.`);
+      setPhase("error");
     }
   };
 
-  const handleKey = (e: React.KeyboardEvent) => { if (e.key==="Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); } };
+  /* ─── Called when agent says done===true ── */
+  const handleDone = (result: AgentResult) => {
+    setAgentResult(result);
+    const triage = result.triage;
+    const decision = result.decision;
 
-  /* ─── Doctor Flow ── */
-  const handleShowDoctors = () => {
-    setMessages(p => [...p, { role:"ai", text:"Here are some recommended doctors based on your symptoms:" }]);
-    setPhase("doctors");
+    if (triage) {
+      pushAI(
+        `✅ Triage complete!\n\n` +
+        `**Risk Level:** ${triage.risk}\n` +
+        `**Confidence:** ${Math.round((triage.confidence || 0) * 100)}%\n` +
+        `**Reason:** ${triage.reason}\n` +
+        `**Key Symptoms:** ${(triage.keySymptoms || []).join(", ")}`
+      );
+    }
+
+    if (decision) {
+      pushAI(
+        `**Recommended Action:** ${decision.action}\n` +
+        `**Recommendation:** ${decision.recommendation}`
+      );
+    }
+
+    setPhase("result");
+
+    // Auto-fetch recommended doctors if specialistNeeded is present
+    if (decision?.specialistNeeded) {
+      fetchDoctors(decision.specialistNeeded);
+    }
   };
 
-  const handleJustTips = () => {
-    const tips = assessment?.suggestions || getWellnessTips("");
-    setMessages(p => [...p, { role:"ai", text:`Here are a few wellness tips for you:\n\n${tips.map((t,i)=>`${i+1}. ${t}`).join("\n")}` }]);
-    setTimeout(() => {
-      setMessages(p => [...p, { role:"ai", text:"Feel free to reach out anytime your symptoms change 🙂" }]);
-      setPhase("tips");
-    }, 1000);
-  };
-
-  const handleBook = (doc: Doctor) => {
-    setIsBooking(true);
-    setBookingDoc(doc);
-    setPhase("booked");
-    setMessages(p => [...p, { role:"ai", text:`Booking your appointment with ${doc.name}...` }]);
-    
-    setTimeout(() => {
-      setMessages(p => [...p, { role:"ai", text:`✅ Confirmed! ${doc.name} — Today. A confirmation has been sent to your email.` }]);
-      setIsBooking(false);
-      
-      // Save
+  /* ─── Fetch recommended doctors ── */
+  const fetchDoctors = async (specialization: string) => {
+    try {
+      const res = await doctorsApi.getAll({ specialization });
+      setDoctors(res.doctors || []);
+      setPhase("doctors");
+      pushAI(`Here are available **${specialization}** doctors for you:`);
+    } catch {
+      // If specialization filter fails, fetch all doctors
       try {
-        const key="mediflow_appointments";
-        const prev=JSON.parse(localStorage.getItem(key)||"[]");
+        const res = await doctorsApi.getAll();
+        setDoctors((res.doctors || []).slice(0, 3));
+        setPhase("doctors");
+        pushAI("Here are some available doctors for you:");
+      } catch {
+        setPhase("result"); // fallback: stay at result phase
+      }
+    }
+  };
+
+  /* ─── Book appointment ── */
+  const handleBook = async (doc: Doctor) => {
+    setBookingLoading(true);
+    setBookingDoc(doc);
+    pushAI(`Booking your appointment with ${doc.name}...`);
+
+    try {
+      await appointmentsApi.create({
+        doctorId:       doc._id,
+        doctorName:     doc.name,
+        specialization: doc.specialization,
+        patientName:    userName,
+        status:         "upcoming",
+        reason:         agentResult?.triage?.reason || "AI Triage Referral",
+      });
+
+      pushAI(`✅ Confirmed! Appointment booked with **${doc.name}** (${doc.specialization}).`);
+      setPhase("booked");
+
+      // Also save to localStorage so PatientDashboard can show it without a reload
+      try {
+        const key = "mediflow_appointments";
+        const prev = JSON.parse(localStorage.getItem(key) || "[]");
         prev.unshift({
           id: Date.now(),
-          doctorName: doc.name, specialization: doc.spec, clinicName: doc.location, fee: doc.fee,
-          dateTime: new Date().toDateString()+" "+randomTime(),
+          doctorName: doc.name,
+          specialization: doc.specialization,
+          clinicName: doc.location || "",
+          fee: doc.fee || "",
+          dateTime: new Date().toDateString(),
           status: "upcoming",
-          bookedOn: new Date().toISOString()
+          bookedOn: new Date().toISOString(),
         });
         localStorage.setItem(key, JSON.stringify(prev));
         window.dispatchEvent(new Event("appointmentUpdated"));
-      } catch {}
-    }, 1500);
+      } catch { /* localStorage optional */ }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Booking failed";
+      pushAI(`❌ Booking failed: ${msg}`);
+    } finally {
+      setBookingLoading(false);
+    }
   };
 
+  /* ─── Reset ── */
   const resetChat = () => {
-    setMessages([]); setInput(""); setTyping(false); setPhase("chat");
-    setConvHist([]); setAnswers([]); setAssessment(null);
-    setBookingDoc(null); setIsBooking(false); setFallback(false); setWellnessMode(false); setQIndex(0);
+    setMessages([]);
+    setInput("");
+    setTyping(false);
+    setPhase("chat");
+    setSessionId(null);
+    setAgentResult(null);
+    setDoctors([]);
+    setBookingDoc(null);
+    setBookingLoading(false);
+    setErrorMsg("");
+    isFirstMessage.current = true;
+
     setTimeout(() => {
       setTyping(true);
       setTimeout(() => {
         setTyping(false);
-        const firstQ = `Hi ${userName}! 👋 I'm your MediFlow AI health assistant. Tell me — what's bothering you today, or how are you feeling overall?`;
-        setMessages([{ role:"ai", text:firstQ }]);
-        setConvHist([{ role:"assistant", content:firstQ }]);
-      }, 900);
+        pushAI(`Hi ${userName}! 👋 I'm MediFlow AI. Tell me — what symptoms are you experiencing today?`);
+      }, 800);
     }, 100);
   };
 
-  const renderFlowchart = () => {
-    if (!assessment) return null;
-    const color = assessment.riskLevel.toLowerCase().includes("high") ? "bg-danger text-white border-danger" : 
-                  assessment.riskLevel.toLowerCase().includes("moderate") ? "bg-warning text-white border-warning" : "bg-success text-white border-success";
-    
+  const handleKey = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); }
+  };
+
+  const inputDisabled = typing || phase !== "chat";
+
+  /* ─── Triage Result Card ── */
+  const renderResult = () => {
+    if (!agentResult?.triage) return null;
+    const { triage, decision } = agentResult;
     return (
-      <div className="my-4 flex flex-col gap-3 animate-fadeUp">
-        <div className="flex items-center justify-between bg-bgLight p-3 rounded-xl border border-bgSoft overflow-x-auto">
-          <div className="flex items-center gap-2 whitespace-nowrap min-w-max px-2">
-            <div className="bg-white border border-bgSoft px-3 py-1.5 rounded-lg text-xs font-semibold text-primary">Symptoms</div>
-            <ArrowRight size={14} className="text-secondary"/>
-            <div className="bg-white border border-bgSoft px-3 py-1.5 rounded-lg text-xs font-semibold text-primary">AI Analysis</div>
-            <ArrowRight size={14} className="text-secondary"/>
-            <div className={`px-3 py-1.5 rounded-lg text-xs font-bold border ${color}`}>{assessment.riskLevel}</div>
-            <ArrowRight size={14} className="text-secondary"/>
-            <div className="bg-white border border-bgSoft px-3 py-1.5 rounded-lg text-xs font-semibold text-primary">Recommendation</div>
-          </div>
+      <div className="my-4 bg-white border border-bgSoft rounded-xl p-5 shadow-sm animate-fadeUp">
+        <div className="flex items-center gap-2 mb-4">
+          <Activity size={18} className="text-accent" />
+          <span className="font-display font-bold text-primary">Triage Result</span>
         </div>
-        
-        {phase === "flowchart" && (
-          <div className="bg-white border border-bgSoft rounded-xl p-4 mt-2">
-            <p className="text-sm text-primary mb-4 font-medium leading-relaxed">Based on my assessment, here's what I recommend. Would you like me to find available doctors for you?</p>
-            <div className="flex flex-wrap gap-2">
-              <button onClick={handleShowDoctors} className="bg-primary hover:bg-secondary transition-colors text-white text-xs font-bold px-4 py-2 rounded-full">Yes, find doctors 👨‍⚕️</button>
-              <button onClick={handleJustTips} className="bg-bgLight hover:bg-bgSoft transition-colors text-primary text-xs font-bold px-4 py-2 rounded-full border border-bgSoft">No, just suggestions</button>
+
+        {/* Risk badge */}
+        <div className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold border mb-4 ${riskColor(triage.risk)}`}>
+          <AlertCircle size={13} />
+          {triage.risk}
+        </div>
+
+        <div className="space-y-2 text-sm text-primary/80">
+          <p><span className="font-semibold">Confidence:</span> {Math.round((triage.confidence || 0) * 100)}%</p>
+          <p><span className="font-semibold">Reason:</span> {triage.reason}</p>
+          {triage.keySymptoms?.length > 0 && (
+            <p><span className="font-semibold">Key Symptoms:</span> {triage.keySymptoms.join(", ")}</p>
+          )}
+        </div>
+
+        {decision && (
+          <div className="mt-4 pt-4 border-t border-bgSoft space-y-2 text-sm text-primary/80">
+            <div className="flex items-center gap-2 mb-2">
+              <CheckCircle2 size={16} className="text-success" />
+              <span className="font-semibold text-primary">Recommendation</span>
             </div>
+            <p><span className="font-semibold">Action:</span> {decision.action}</p>
+            <p>{decision.recommendation}</p>
+            {decision.specialistNeeded && (
+              <p><span className="font-semibold">Specialist Needed:</span> {decision.specialistNeeded}</p>
+            )}
           </div>
         )}
       </div>
     );
   };
 
-  const disabled = typing || (phase !== "chat");
-  const spec = matchSpec(answers[0]||"");
-  const recommendedDoctors = DOCTOR_DB[spec] || DOCTOR_DB["General Physician"];
+  /* ─── Doctor cards ── */
+  const renderDoctors = () => {
+    if (phase !== "doctors" && phase !== "booked") return null;
+    return (
+      <div className="ml-9 flex flex-col gap-3 animate-fadeUp">
+        {doctors.map((doc, i) => (
+          <div key={doc._id || i} className="bg-white border border-bgSoft rounded-xl p-4 shadow-sm">
+            <div className="flex justify-between items-start mb-3">
+              <div>
+                <div className="font-bold text-primary text-base">{doc.name}</div>
+                <div className="text-secondary text-sm font-semibold">{doc.specialization}</div>
+              </div>
+              <span className={`text-xs font-bold px-3 py-1 rounded-full ${doc.available ? "bg-success/10 text-success" : "bg-warning/10 text-warning"}`}>
+                {doc.available ? "Available" : "Busy"}
+              </span>
+            </div>
+
+            <div className="flex flex-wrap gap-3 text-[13px] text-primary/60 mb-4">
+              {doc.rating  && <span>⭐ {doc.rating}</span>}
+              {doc.location && <span>📍 {doc.location}</span>}
+              {doc.fee      && <span>💰 {doc.fee}</span>}
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                id={`book-doctor-${doc._id || i}`}
+                onClick={() => handleBook(doc)}
+                disabled={bookingLoading || phase === "booked"}
+                className="bg-primary text-white text-sm font-bold px-4 py-2.5 rounded-lg flex-1 hover:bg-secondary transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {bookingLoading && bookingDoc?._id === doc._id ? "Booking…" : "Book Appointment"}
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  };
 
   return (
     <div className="flex flex-col h-full bg-[#f0f7fb]">
+
       {/* ─── Chat Area ─── */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
-        {messages.map((m,i) => (
-          <div key={i} className={`flex ${m.role==="user"?"justify-end":"justify-start"}`}>
-            {m.role==="ai" && <div className="w-8 h-8 rounded-full bg-accent flex items-center justify-center shrink-0 self-end mr-2"><Bot size={16} className="text-white"/></div>}
-            <div className={`max-w-[80%] px-5 py-3 text-[15px] leading-relaxed shadow-sm whitespace-pre-wrap ${m.role==="ai"?"bg-[#9ecfe3] text-primary rounded-[18px] rounded-bl-sm font-medium":"bg-white text-primary rounded-[18px] rounded-br-sm border border-bgSoft"}`}>
+
+        {messages.map((m, i) => (
+          <div key={i} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
+            {m.role === "ai" && (
+              <div className="w-8 h-8 rounded-full bg-accent flex items-center justify-center shrink-0 self-end mr-2">
+                <Bot size={16} className="text-white" />
+              </div>
+            )}
+            <div className={`max-w-[80%] px-5 py-3 text-[15px] leading-relaxed shadow-sm whitespace-pre-wrap ${
+              m.role === "ai"
+                ? "bg-[#9ecfe3] text-primary rounded-[18px] rounded-bl-sm font-medium"
+                : "bg-white text-primary rounded-[18px] rounded-br-sm border border-bgSoft"
+            }`}>
               {m.text}
             </div>
           </div>
         ))}
 
+        {/* Typing indicator */}
         {typing && (
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center shrink-0"><Bot size={16} className="text-white"/></div>
+            <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center shrink-0">
+              <Bot size={16} className="text-white" />
+            </div>
             <div className="bg-white border border-bgSoft px-5 py-4 rounded-[18px] rounded-bl-sm flex gap-1.5 shadow-sm">
-              <span className="w-1.5 h-1.5 rounded-full bg-secondary animate-bounce" style={{animationDelay:"0ms"}}/>
-              <span className="w-1.5 h-1.5 rounded-full bg-secondary animate-bounce" style={{animationDelay:"150ms"}}/>
-              <span className="w-1.5 h-1.5 rounded-full bg-secondary animate-bounce" style={{animationDelay:"300ms"}}/>
+              <span className="w-1.5 h-1.5 rounded-full bg-secondary animate-bounce" style={{ animationDelay: "0ms" }} />
+              <span className="w-1.5 h-1.5 rounded-full bg-secondary animate-bounce" style={{ animationDelay: "150ms" }} />
+              <span className="w-1.5 h-1.5 rounded-full bg-secondary animate-bounce" style={{ animationDelay: "300ms" }} />
             </div>
           </div>
         )}
 
-        {/* Elements injected based on phase */}
-        {(phase !== "chat") && renderFlowchart()}
+        {/* Triage result */}
+        {(phase === "result" || phase === "doctors" || phase === "booked") && renderResult()}
 
-        {phase === "doctors" && (
-          <div className="ml-9 flex flex-col gap-3 animate-fadeUp">
-            {recommendedDoctors.map((doc,i)=>(
-              <div key={i} className="bg-white border border-bgSoft rounded-xl p-4 shadow-sm">
-                <div className="flex justify-between items-start mb-3">
-                  <div>
-                    <div className="font-bold text-primary text-base">{doc.name}</div>
-                    <div className="text-secondary text-sm font-semibold">{doc.spec}</div>
-                  </div>
-                  <span className={`text-xs font-bold px-3 py-1 rounded-full ${doc.availability.includes("Today")?"bg-success/10 text-success":"bg-warning/10 text-warning"}`}>{doc.availability}</span>
-                </div>
-                <div className="flex gap-4 text-[13px] text-primary/60 mb-4">
-                  <span>{doc.rating}</span><span>📍 {doc.location}</span><span>💰 {doc.fee}</span>
-                </div>
-                <div className="flex gap-3">
-                  <button onClick={()=>handleBook(doc)} className="bg-primary text-white text-sm font-bold px-4 py-2.5 rounded-lg flex-1 hover:bg-secondary transition-colors shadow-sm">Book Appointment</button>
-                  <button className="bg-bgLight text-primary text-sm font-bold px-4 py-2.5 rounded-lg flex-1 border border-bgSoft hover:bg-white transition-colors">View Profile</button>
-                </div>
-              </div>
-            ))}
+        {/* Doctor recommendations */}
+        {renderDoctors()}
+
+        {/* Error state */}
+        {phase === "error" && (
+          <div className="mx-2 bg-red-50 border border-red-200 rounded-xl p-4 text-sm text-red-700">
+            <div className="flex items-center gap-2 font-bold mb-1">
+              <AlertCircle size={16} /> Connection Error
+            </div>
+            <p>{errorMsg}</p>
           </div>
         )}
 
-        {(phase === "tips" || (phase === "booked" && !isBooking)) && (
+        {/* Reset button */}
+        {(phase === "booked" || phase === "error") && (
           <div className="flex justify-center mt-5">
-            <button onClick={resetChat} className="bg-white border border-bgSoft text-primary text-sm font-bold px-5 py-3 rounded-full flex items-center gap-2 shadow-sm hover:bg-bgLight transition-colors">
-              <RotateCcw size={16}/> Start New Check
+            <button
+              onClick={resetChat}
+              className="bg-white border border-bgSoft text-primary text-sm font-bold px-5 py-3 rounded-full flex items-center gap-2 shadow-sm hover:bg-bgLight transition-colors"
+            >
+              <RotateCcw size={16} /> Start New Check
             </button>
           </div>
         )}
 
-        <div ref={bottomRef}/>
+        <div ref={bottomRef} />
       </div>
 
       {/* ─── Input Area ─── */}
       <div className="p-4 bg-[#f0f7fb] shrink-0 border-t border-bgSoft/50">
         <div className="flex gap-3 max-w-2xl mx-auto">
-          <input 
-            className={`flex-1 bg-white border border-bgSoft rounded-full px-5 py-3 text-[15px] outline-none transition-colors shadow-sm ${disabled ? "opacity-60 cursor-not-allowed" : "focus:border-secondary focus:ring-1 focus:ring-secondary"}`}
-            placeholder={disabled ? (phase !== "chat" ? "Follow the prompts above..." : "MediFlow AI is typing...") : "Message triage..."}
-            value={input} onChange={e=>setInput(e.target.value)} onKeyDown={handleKey} disabled={disabled}
+          <input
+            id="triage-chat-input"
+            className={`flex-1 bg-white border border-bgSoft rounded-full px-5 py-3 text-[15px] outline-none transition-colors shadow-sm ${
+              inputDisabled
+                ? "opacity-60 cursor-not-allowed"
+                : "focus:border-secondary focus:ring-1 focus:ring-secondary"
+            }`}
+            placeholder={
+              inputDisabled
+                ? phase !== "chat" ? "Follow the prompts above…" : "MediFlow AI is typing…"
+                : "Describe your symptoms…"
+            }
+            value={input}
+            onChange={e => setInput(e.target.value)}
+            onKeyDown={handleKey}
+            disabled={inputDisabled}
           />
-          <button 
-            className={`w-12 h-12 rounded-full flex items-center justify-center shrink-0 transition-colors bg-white shadow-sm border border-bgSoft ${(disabled||!input.trim()) ? "text-primary/30 cursor-not-allowed" : "text-accent hover:text-primary hover:bg-bgLight"}`}
-            onClick={handleSend} disabled={disabled||!input.trim()}
+          <button
+            id="triage-send-btn"
+            className={`w-12 h-12 rounded-full flex items-center justify-center shrink-0 transition-colors bg-white shadow-sm border border-bgSoft ${
+              inputDisabled || !input.trim()
+                ? "text-primary/30 cursor-not-allowed"
+                : "text-accent hover:text-primary hover:bg-bgLight"
+            }`}
+            onClick={handleSend}
+            disabled={inputDisabled || !input.trim()}
           >
-            <Send size={20} className="mr-0.5 mt-0.5"/>
+            <Send size={20} className="mr-0.5 mt-0.5" />
           </button>
         </div>
+        <p className="text-center text-xs text-primary/30 mt-2">
+          Powered by MediFlow AI Agent · Connected to backend at{" "}
+          {process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"}
+        </p>
       </div>
     </div>
   );

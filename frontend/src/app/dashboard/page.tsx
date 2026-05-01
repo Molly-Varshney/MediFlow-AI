@@ -1,93 +1,92 @@
-import React from "react";
-import {
-  Users,
-  AlertTriangle,
-  Clock,
-  CheckCircle,
-} from "lucide-react";
+"use client";
+
+import React, { useEffect, useState } from "react";
+import { Users, AlertTriangle, Clock, CheckCircle } from "lucide-react";
 import { Sidebar } from "../../components/Sidebar";
 import { Card } from "../../components/ui/Card";
 import { TriageCard } from "../../components/TriageCard";
 import { cn } from "../../lib/utils";
 import Link from "next/link";
+import { dashboardApi, triageApi, type DashboardSummary, type TriageSession } from "../../lib/api";
 
-// Summary card data
-const summaryCards = [
-  {
-    label: "Total Patients",
-    value: "124",
-    icon: Users,
-    borderColor: "border-primary",
-    iconColor: "text-primary",
-  },
-  {
-    label: "Emergency",
-    value: "8",
-    icon: AlertTriangle,
-    borderColor: "border-danger",
-    iconColor: "text-danger",
-  },
-  {
-    label: "Pending Triage",
-    value: "23",
-    icon: Clock,
-    borderColor: "border-warning",
-    iconColor: "text-warning",
-  },
-  {
-    label: "Resolved Today",
-    value: "93",
-    icon: CheckCircle,
-    borderColor: "border-success",
-    iconColor: "text-success",
-  },
-];
-
-// Mock triage queue
-const triageQueue = [
-  {
-    name: "Ayesha Khan",
-    age: 34,
-    condition: "Chest Pain",
-    priority: "emergency" as const,
-    waitTime: "8 min",
-    assignedDoctor: "Dr. Ahmed",
-  },
-  {
-    name: "Rohan Mehta",
-    age: 56,
-    condition: "Suspected Fracture",
-    priority: "high" as const,
-    waitTime: "15 min",
-    assignedDoctor: "Dr. Patel",
-  },
-  {
-    name: "Sara Ali",
-    age: 28,
-    condition: "High Fever",
-    priority: "normal" as const,
-    waitTime: "22 min",
-    assignedDoctor: "Dr. Nair",
-  },
-  {
-    name: "Vikram Das",
-    age: 45,
-    condition: "Migraine",
-    priority: "low" as const,
-    waitTime: "35 min",
-    assignedDoctor: "Dr. Ahmed",
-  },
-  {
-    name: "Priya Sharma",
-    age: 67,
-    condition: "Shortness of Breath",
-    priority: "emergency" as const,
-    waitTime: "5 min",
-    assignedDoctor: "Dr. Kapoor",
-  },
-];
+/* ─── Priority map from triage session state ── */
+function sessionPriority(session: TriageSession): "emergency" | "high" | "normal" | "low" {
+  const s = (session.status || "").toLowerCase();
+  if (s.includes("emergency") || s.includes("critical")) return "emergency";
+  if (s.includes("high") || s.includes("urgent"))        return "high";
+  if (s.includes("low"))                                  return "low";
+  return "normal";
+}
 
 export default function DashboardPage() {
+  const [summary, setSummary]       = useState<DashboardSummary | null>(null);
+  const [sessions, setSessions]     = useState<TriageSession[]>([]);
+  const [loading, setLoading]       = useState(true);
+  const [error, setError]           = useState("");
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function load() {
+      setLoading(true);
+      setError("");
+      try {
+        const [summaryRes, sessionsRes] = await Promise.allSettled([
+          dashboardApi.summary(),
+          triageApi.getSessions(),
+        ]);
+
+        if (cancelled) return;
+
+        if (summaryRes.status === "fulfilled") setSummary(summaryRes.value.data);
+        if (sessionsRes.status === "fulfilled") setSessions(sessionsRes.value.sessions || []);
+
+        if (summaryRes.status === "rejected" && sessionsRes.status === "rejected") {
+          setError("Could not reach backend. Make sure your server is running on http://localhost:5000.");
+        }
+      } catch {
+        if (!cancelled) setError("Unexpected error loading dashboard.");
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+
+    load();
+    return () => { cancelled = true; };
+  }, []);
+
+  /* ─── Summary cards (live or skeleton) ── */
+  const summaryCards = [
+    {
+      label: "Total Patients",
+      value: loading ? "…" : (summary ? String(summary.totalPatients) : "—"),
+      icon: Users,
+      borderColor: "border-primary",
+      iconColor: "text-primary",
+    },
+    {
+      label: "Emergency",
+      value: loading ? "…" : (summary ? String(summary.emergencyCases) : "—"),
+      icon: AlertTriangle,
+      borderColor: "border-danger",
+      iconColor: "text-danger",
+    },
+    {
+      label: "Pending Triage",
+      value: loading ? "…" : (summary ? String(summary.todayAppointments) : "—"),
+      icon: Clock,
+      borderColor: "border-warning",
+      iconColor: "text-warning",
+    },
+    {
+      label: "Available Doctors",
+      value: loading ? "…" : (summary ? String(summary.availableDoctors) : "—"),
+      icon: CheckCircle,
+      borderColor: "border-success",
+      iconColor: "text-success",
+    },
+  ];
+
   return (
     <div className="flex h-[calc(100vh-64px)]">
       {/* Sidebar — hidden on mobile */}
@@ -100,12 +99,19 @@ export default function DashboardPage() {
         {/* Header */}
         <header className="mb-8">
           <h1 className="font-display text-2xl font-bold text-primary">
-            Good morning, Dr. Ahmed 👋
+            MediFlow Dashboard 👋
           </h1>
           <p className="text-secondary text-sm mt-1">
-            Here&apos;s today&apos;s triage overview
+            Live overview — {new Date().toDateString()}
           </p>
         </header>
+
+        {/* Error banner */}
+        {error && (
+          <div className="mb-6 bg-danger/10 border border-danger/20 rounded-xl px-4 py-3 text-danger text-sm font-medium">
+            ⚠ {error}
+          </div>
+        )}
 
         {/* Summary cards */}
         <section
@@ -113,24 +119,21 @@ export default function DashboardPage() {
           aria-label="Summary statistics"
         >
           {summaryCards.map(({ label, value, icon: Icon, borderColor, iconColor }) => (
-            <Card
-              key={label}
-              className={cn("border-t-4", borderColor)}
-            >
+            <Card key={label} className={cn("border-t-4", borderColor)}>
               <div className="flex items-center justify-between mb-3">
                 <Icon className={cn("w-5 h-5", iconColor)} aria-hidden="true" />
               </div>
-              <p className={cn("font-display text-2xl font-bold text-primary")}>{value}</p>
+              <p className="font-display text-2xl font-bold text-primary">{value}</p>
               <p className="text-sm text-secondary mt-1">{label}</p>
             </Card>
           ))}
         </section>
 
-        {/* Triage queue */}
+        {/* Triage queue from real sessions */}
         <section aria-label="Active triage queue">
           <div className="flex items-center justify-between mb-4">
             <h2 className="font-display text-lg font-semibold text-primary">
-              Active Triage Queue
+              Active Triage Sessions
             </h2>
             <Link
               href="/triage"
@@ -140,11 +143,32 @@ export default function DashboardPage() {
             </Link>
           </div>
 
-          <div className="flex flex-col gap-3">
-            {triageQueue.map((patient) => (
-              <TriageCard key={patient.name} {...patient} />
-            ))}
-          </div>
+          {loading ? (
+            <div className="flex flex-col gap-3">
+              {[1, 2, 3].map(i => (
+                <div key={i} className="h-20 bg-white rounded-xl border border-bgSoft animate-pulse" />
+              ))}
+            </div>
+          ) : sessions.length === 0 ? (
+            <div className="text-center py-12 bg-white rounded-xl border border-bgSoft">
+              <p className="text-primary/50 font-medium">No active triage sessions.</p>
+              <p className="text-primary/30 text-sm mt-1">Sessions will appear here once patients start the AI triage flow.</p>
+            </div>
+          ) : (
+            <div className="flex flex-col gap-3">
+              {sessions.slice(0, 8).map((session) => (
+                <TriageCard
+                  key={session.sessionId || session._id}
+                  name={session.patientName || "Unknown Patient"}
+                  age={0}
+                  condition={session.status || "In Progress"}
+                  priority={sessionPriority(session)}
+                  waitTime={new Date(session.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                  assignedDoctor="—"
+                />
+              ))}
+            </div>
+          )}
         </section>
       </div>
     </div>

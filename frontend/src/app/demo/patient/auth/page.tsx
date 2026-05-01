@@ -11,6 +11,7 @@ import { Card } from "../../../../components/ui/Card";
 import { Button } from "../../../../components/ui/Button";
 import { InputField } from "../../../../components/ui/InputField";
 import { DemoNavbar } from "../../../../components/layout/DemoNavbar";
+import { authApi } from "../../../../lib/api";
 
 const BLOOD_GROUPS = ["Select blood group","A+","A-","B+","B-","AB+","AB-","O+","O-","Unknown"];
 const GENDERS     = ["Select gender","Male","Female","Non-binary","Prefer not to say"];
@@ -39,8 +40,8 @@ export default function PatientAuthPage() {
   /* ── Auto-redirect if already logged in ── */
   useEffect(() => {
     try {
-      const stored = localStorage.getItem("mediflow_user");
-      if (stored) router.replace("/demo/patient/dashboard");
+      const token = localStorage.getItem("mediflow_token");
+      if (token) router.replace("/demo/patient/dashboard");
     } catch {}
   }, [router]);
 
@@ -68,30 +69,40 @@ export default function PatientAuthPage() {
     return e;
   };
 
-  /* ── Submit ── */
-  const handleSubmit = () => {
+  /* ── Submit — calls real backend ── */
+  const handleSubmit = async () => {
     const errs = mode === "signup" ? validateSignup() : validateLogin();
     if (Object.keys(errs).length) { setErrors(errs); return; }
     setErrors({});
     setLoading(true);
 
-    setTimeout(() => {
+    try {
       if (mode === "signup") {
-        const user = { name, email, password, age, height, weight, bloodGroup, gender, conditions, medications, allergies };
-        localStorage.setItem("mediflow_user", JSON.stringify(user));
+        const res = await authApi.register({
+          name, email, password, role: "patient",
+          age, height, weight, bloodGroup, gender,
+          conditions, medications, allergies,
+        });
+        // Persist token + user profile
+        localStorage.setItem("mediflow_token", res.token);
+        localStorage.setItem("mediflow_user", JSON.stringify({
+          ...res.user,
+          age, height, weight, bloodGroup, gender,
+          conditions, medications, allergies,
+        }));
         router.push("/demo/patient/dashboard");
       } else {
-        try {
-          const stored = localStorage.getItem("mediflow_user");
-          if (!stored) { setErrors({ form: "No account found. Please sign up first." }); setLoading(false); return; }
-          const user = JSON.parse(stored);
-          if (user.email !== email || user.password !== password) {
-            setErrors({ form: "Incorrect email or password" }); setLoading(false); return;
-          }
-          router.push("/demo/patient/dashboard");
-        } catch { setErrors({ form: "Something went wrong." }); setLoading(false); }
+        const res = await authApi.login({ email, password });
+        localStorage.setItem("mediflow_token", res.token);
+        localStorage.setItem("mediflow_user", JSON.stringify(res.user));
+        router.push("/demo/patient/dashboard");
       }
-    }, 1000);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Something went wrong.";
+      setErrors({ form: msg });
+    } finally {
+      setLoading(false);
+    }
   };
 
   const sel = (err?: string) =>
@@ -236,7 +247,9 @@ export default function PatientAuthPage() {
 
           <div className="mt-4 bg-bgSoft rounded-xl p-3 flex gap-2 items-start">
             <ShieldCheck className="text-success shrink-0 mt-0.5" size={16} />
-            <p className="text-xs text-primary/60 leading-relaxed">Demo mode · Data stored in browser localStorage only</p>
+            <p className="text-xs text-primary/60 leading-relaxed">
+              Your data is securely handled by the MediFlow backend server.
+            </p>
           </div>
 
           <Button variant="primary" size="lg" className="w-full mt-5" onClick={handleSubmit} loading={loading}>

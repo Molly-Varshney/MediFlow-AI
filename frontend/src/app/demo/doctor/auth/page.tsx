@@ -9,43 +9,49 @@ import { Button } from "../../../../components/ui/Button";
 import { InputField } from "../../../../components/ui/InputField";
 import { DemoNavbar } from "../../../../components/layout/DemoNavbar";
 import { useMediFlowStore } from "../../../../store/useMediFlowStore";
+import { authApi } from "../../../../lib/api";
 
 export default function DoctorAuthPage() {
-  const router = useRouter();
+  const router  = useRouter();
   const setRole = useMediFlowStore((state) => state.setRole);
 
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [emailError, setEmailError] = useState("");
+  const [email, setEmail]             = useState("");
+  const [password, setPassword]       = useState("");
+  const [emailError, setEmailError]   = useState("");
   const [passwordError, setPasswordError] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [formError, setFormError]     = useState("");
+  const [loading, setLoading]         = useState(false);
 
-  const handleLogin = () => {
+  const handleLogin = async () => {
     let isValid = true;
 
     if (!email.trim() || !email.includes("@")) {
       setEmailError("Please enter a valid clinic email address");
       isValid = false;
-    } else {
-      setEmailError("");
-    }
+    } else { setEmailError(""); }
 
     if (password.trim().length < 6) {
       setPasswordError("Password must be at least 6 characters");
       isValid = false;
-    } else {
-      setPasswordError("");
-    }
+    } else { setPasswordError(""); }
 
     if (!isValid) return;
 
     setLoading(true);
-    setRole("doctor");
+    setFormError("");
 
-    // Simulate authentication delay
-    setTimeout(() => {
+    try {
+      const res = await authApi.login({ email, password });
+      localStorage.setItem("mediflow_token", res.token);
+      localStorage.setItem("mediflow_user", JSON.stringify(res.user));
+      setRole("doctor");
       router.push("/demo/doctor");
-    }, 1200);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Login failed. Please try again.";
+      setFormError(msg);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -64,16 +70,19 @@ export default function DoctorAuthPage() {
             Enter your credentials to access the MediFlow dashboard.
           </p>
 
+          {formError && (
+            <div className="mt-4 bg-danger/10 border border-danger/20 rounded-xl px-4 py-3 text-danger text-sm font-medium">
+              {formError}
+            </div>
+          )}
+
           <div className="mt-8 space-y-4">
             <InputField
               label="Professional Email"
               type="email"
               placeholder="doctor@hospital.com"
               value={email}
-              onChange={(e) => {
-                setEmail(e.target.value);
-                if (emailError) setEmailError("");
-              }}
+              onChange={(e) => { setEmail(e.target.value); if (emailError) setEmailError(""); }}
               error={emailError}
               leftIcon={<Mail size={16} />}
               required
@@ -84,10 +93,7 @@ export default function DoctorAuthPage() {
               type="password"
               placeholder="••••••••"
               value={password}
-              onChange={(e) => {
-                setPassword(e.target.value);
-                if (passwordError) setPasswordError("");
-              }}
+              onChange={(e) => { setPassword(e.target.value); if (passwordError) setPasswordError(""); }}
               error={passwordError}
               leftIcon={<Lock size={16} />}
               required
@@ -120,7 +126,8 @@ export default function DoctorAuthPage() {
           </Button>
 
           <div className="mt-6 text-center text-sm text-primary/60">
-            Don't have an account? <a href="#" className="text-accent font-medium hover:underline">Request clinic access</a>
+            Don&apos;t have an account?{" "}
+            <a href="#" className="text-accent font-medium hover:underline">Request clinic access</a>
           </div>
         </Card>
       </PageContainer>
