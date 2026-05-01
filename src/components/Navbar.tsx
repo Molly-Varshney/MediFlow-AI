@@ -9,7 +9,7 @@ const navLinks = [
   { label: "Platform",     href: "#platform" },
   { label: "How It Works", href: "#how-it-works" },
   { label: "Features",     href: "#features" },
-  { label: "Contact",      href: "#contact" },
+  { label: "Contact",      href: "/demo" },
 ];
 
 export function Navbar() {
@@ -67,7 +67,7 @@ export function Navbar() {
 
           {/* CTA */}
           <a
-            href="#contact"
+            href="/demo"
             className="hidden sm:inline-flex px-4 py-2 rounded-lg text-sm font-semibold transition-colors duration-200
               bg-primary text-white hover:bg-secondary
               dark:bg-accent dark:text-primary dark:hover:bg-secondary"
@@ -117,7 +117,7 @@ export function Navbar() {
               {theme === "dark" ? "Light Mode" : "Dark Mode"}
             </button>
             <a
-              href="#contact"
+              href="/demo"
               onClick={() => setMobileOpen(false)}
               className="ml-auto px-4 py-2 rounded-lg text-sm font-semibold
                 bg-primary text-white dark:bg-accent dark:text-primary"

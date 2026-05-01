@@ -85,7 +85,7 @@ function HeroSection() {
 
           <div className="mt-8 flex flex-wrap gap-4">
             <a
-              href="#contact"
+              href="/demo"
               className="px-7 py-3 rounded-xl font-semibold text-sm transition shadow-lg
                 bg-primary text-white hover:bg-secondary
                 dark:bg-accent dark:text-primary dark:hover:bg-secondary"
