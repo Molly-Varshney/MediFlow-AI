@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Activity, ChevronDown, Bot } from "lucide-react";
+import { Activity, ChevronDown, Bot, Heart, AlertCircle } from "lucide-react";
 import { PageContainer } from "../../../../components/ui/PageContainer";
 import { Card } from "../../../../components/ui/Card";
 import { Button } from "../../../../components/ui/Button";
@@ -26,15 +26,33 @@ const DURATIONS = [
   "Chronic / Ongoing"
 ];
 
+const GENDERS = ["Select gender", "Male", "Female", "Non-binary", "Prefer not to say"];
+
+const CONDITIONS_OPTIONS = [
+  "Diabetes", "Hypertension", "Asthma", "Heart Disease",
+  "Thyroid Disorder", "Arthritis", "Depression / Anxiety", "None"
+];
+
 export default function PatientFormPage() {
   const router = useRouter();
-  const { patientInfo, setFormData } = useMediFlowStore();
+  const { patientInfo, setFormData, setHealthHistory } = useMediFlowStore();
 
+  // Symptom fields
   const [symptoms, setSymptoms] = useState("");
   const [severity, setSeverity] = useState(5);
   const [duration, setDuration] = useState("");
   const [additionalNotes, setAdditionalNotes] = useState("");
+
+  // Health history fields
+  const [age, setAge] = useState("");
+  const [gender, setGender] = useState("");
+  const [selectedConditions, setSelectedConditions] = useState<string[]>([]);
+  const [surgeries, setSurgeries] = useState("");
+  const [allergies, setAllergies] = useState("");
+  const [medications, setMedications] = useState("");
+
   const [isProcessing, setIsProcessing] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
   useEffect(() => {
     if (!patientInfo.name) {
@@ -43,22 +61,59 @@ export default function PatientFormPage() {
   }, [patientInfo.name, router]);
 
   const handleAddSymptomTag = (tag: string) => {
-    const newSymptoms = symptoms ? `${symptoms}, ${tag}` : tag;
-    setSymptoms(newSymptoms);
+    if (symptoms.includes(tag)) return;
+    setSymptoms((prev) => (prev ? `${prev}, ${tag}` : tag));
+  };
+
+  const toggleCondition = (cond: string) => {
+    setSelectedConditions((prev) =>
+      prev.includes(cond) ? prev.filter((c) => c !== cond) : [...prev, cond]
+    );
   };
 
   const getSeverityBadge = () => {
-    if (severity <= 3) return { label: "Normal", color: "bg-success/10 text-success border-success/30" };
-    if (severity <= 6) return { label: "Moderate", color: "bg-yellow-50 text-yellow-700 border-yellow-200" };
-    if (severity <= 8) return { label: "High", color: "bg-warning/10 text-warning border-warning/30" };
-    return { label: "Emergency", color: "bg-danger/10 text-danger border-danger/30" };
+    if (severity <= 3) return { label: "Normal",    color: "bg-success/10 text-success border-success/30" };
+    if (severity <= 6) return { label: "Moderate",  color: "bg-yellow-50 text-yellow-700 border-yellow-200" };
+    if (severity <= 8) return { label: "High",      color: "bg-warning/10 text-warning border-warning/30" };
+    return                   { label: "Emergency",  color: "bg-danger/10 text-danger border-danger/30" };
   };
 
   const badgeProps = getSeverityBadge();
 
+  const validate = () => {
+    const newErrors: Record<string, string> = {};
+    if (symptoms.trim().length < 10) newErrors.symptoms = "Please describe your symptoms (min 10 chars).";
+    if (!age || isNaN(Number(age)) || Number(age) < 1 || Number(age) > 120)
+      newErrors.age = "Please enter a valid age (1–120).";
+    if (!gender || gender === "Select gender") newErrors.gender = "Please select your gender.";
+    return newErrors;
+  };
+
   const handleSubmit = () => {
+    const validationErrors = validate();
+    if (Object.keys(validationErrors).length > 0) {
+      setErrors(validationErrors);
+      return;
+    }
+    setErrors({});
     setIsProcessing(true);
-    setFormData({ symptoms, severity, duration: duration === "Select duration" ? "" : duration, additionalNotes });
+
+    setFormData({
+      symptoms,
+      severity,
+      duration: duration === "Select duration" ? "" : duration,
+      additionalNotes,
+    });
+
+    setHealthHistory({
+      age,
+      gender,
+      conditions: selectedConditions.join(", "),
+      surgeries,
+      allergies,
+      medications,
+    });
+
     setTimeout(() => {
       router.push("/demo/patient/dashboard");
     }, 2500);
@@ -71,6 +126,7 @@ export default function PatientFormPage() {
       <DemoNavbar showBack backHref="/demo/patient/auth" title="Symptom Check" step={2} totalSteps={3} />
       <PageContainer maxWidth="md">
 
+        {/* Session Banner */}
         <Card glass padding="md" className="mb-6 animate-fadeIn flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="bg-primary text-white font-bold font-display text-sm rounded-full w-9 h-9 flex items-center justify-center uppercase shrink-0">
@@ -86,12 +142,11 @@ export default function PatientFormPage() {
           </div>
         </Card>
 
-        <Card padding="lg" className="animate-fadeUp">
+        {/* ── SECTION 1: Symptom Assessment ── */}
+        <Card padding="lg" className="animate-fadeUp mb-6">
           <div className="flex items-center gap-2">
             <Activity className="text-accent" size={24} />
-            <h2 className="font-display text-xl text-primary font-bold">
-              Symptom Assessment
-            </h2>
+            <h2 className="font-display text-xl text-primary font-bold">Symptom Assessment</h2>
           </div>
           <p className="text-secondary text-sm mt-1">
             Fill in as much detail as possible for accurate AI triage
@@ -99,23 +154,31 @@ export default function PatientFormPage() {
           <div className="border-t border-bgSoft mt-4 mb-6" />
 
           <div className="space-y-6">
-            {/* Field 1: Symptoms */}
+            {/* Symptoms */}
             <div>
               <label className="text-sm font-semibold text-primary mb-1.5 flex items-center">
                 What are your primary symptoms? <span className="text-danger ml-1">*</span>
               </label>
               <div className="relative">
                 <textarea
-                  className="w-full bg-bgLight/60 border border-bgSoft rounded-xl px-4 py-3 h-28 resize-none text-primary text-sm placeholder:text-primary/30 focus:outline-none focus:ring-2 focus:ring-accent transition"
-                  placeholder="Describe your symptoms in detail, e.g. 'Severe chest pain radiating to left arm, shortness of breath, started 2 hours ago...'"
+                  className={`w-full bg-bgLight/60 border rounded-xl px-4 py-3 h-28 resize-none text-primary text-sm placeholder:text-primary/30 focus:outline-none focus:ring-2 focus:ring-accent transition ${errors.symptoms ? "border-danger" : "border-bgSoft"}`}
+                  placeholder="Describe your symptoms in detail, e.g. 'Severe chest pain radiating to left arm, shortness of breath...'"
                   value={symptoms}
-                  onChange={(e) => setSymptoms(e.target.value.substring(0, 500))}
+                  onChange={(e) => {
+                    setSymptoms(e.target.value.substring(0, 500));
+                    if (errors.symptoms) setErrors((prev) => ({ ...prev, symptoms: "" }));
+                  }}
                   maxLength={500}
                 />
                 <span className="absolute bottom-3 right-3 text-xs text-primary/30 font-medium">
                   {symptoms.length}/500
                 </span>
               </div>
+              {errors.symptoms && (
+                <p className="text-danger text-xs mt-1.5 flex items-center gap-1">
+                  <AlertCircle size={12} /> {errors.symptoms}
+                </p>
+              )}
 
               <div className="mt-3">
                 <p className="text-xs text-primary/60 mb-2 font-medium">Common symptoms — tap to add:</p>
@@ -133,7 +196,7 @@ export default function PatientFormPage() {
               </div>
             </div>
 
-            {/* Field 2: Severity */}
+            {/* Severity */}
             <div className="pt-2">
               <div className="flex justify-between items-center mb-3">
                 <label className="text-sm font-semibold text-primary">
@@ -143,12 +206,8 @@ export default function PatientFormPage() {
                   {severity} — {badgeProps.label}
                 </span>
               </div>
-
               <input
-                type="range"
-                min="1"
-                max="10"
-                step="1"
+                type="range" min="1" max="10" step="1"
                 value={severity}
                 onChange={(e) => setSeverity(parseInt(e.target.value))}
                 className="w-full h-2 rounded-lg appearance-none cursor-pointer border border-bgSoft/50"
@@ -163,7 +222,7 @@ export default function PatientFormPage() {
               </div>
             </div>
 
-            {/* Field 3: Duration */}
+            {/* Duration */}
             <div>
               <label className="text-sm font-semibold text-primary mb-1.5 block">
                 How long have you had these symptoms?
@@ -180,7 +239,7 @@ export default function PatientFormPage() {
               </div>
             </div>
 
-            {/* Field 4: Additional */}
+            {/* Additional */}
             <div>
               <InputField
                 label="Any additional information?"
@@ -190,44 +249,180 @@ export default function PatientFormPage() {
                 onChange={(e) => setAdditionalNotes(e.target.value)}
               />
             </div>
-
-            <div className="mt-6 bg-primary/5 border border-primary/10 rounded-xl p-4 flex gap-3 items-start">
-              <Bot className="text-accent shrink-0 mt-0.5" size={18} />
-              <p className="text-xs text-primary/70 leading-relaxed">
-                MediFlow AI will analyze your input using clinical triage protocols. Results are indicative only — always consult a qualified physician.
-              </p>
-            </div>
-
-            {isProcessing ? (
-              <Card padding="md" className="bg-primary border-primary mt-6 overflow-hidden relative">
-                <div className="absolute inset-0 bg-white/5 animate-pulse" />
-                <div className="relative z-10">
-                  <div className="flex items-center justify-center gap-3 mb-4">
-                    <span className="animate-spin border-2 border-white/30 border-t-white rounded-full w-5 h-5" />
-                    <p className="text-white font-semibold text-sm">MediFlow AI is analyzing your symptoms...</p>
-                  </div>
-                  <div className="w-full h-1.5 bg-white/10 rounded-full overflow-hidden relative">
-                    <div className="absolute top-0 left-0 h-full w-full bg-gradient-to-r from-accent via-white/80 to-accent shimmer-bg animate-shimmer" />
-                  </div>
-                  <p className="text-center text-white/60 text-xs mt-3 font-medium">
-                    Checking clinical protocols · Assessing risk factors · Generating report
-                  </p>
-                </div>
-              </Card>
-            ) : (
-              <Button
-                variant="primary"
-                size="lg"
-                className="w-full mt-6"
-                disabled={symptoms.trim().length < 10}
-                onClick={handleSubmit}
-              >
-                Analyze My Symptoms →
-              </Button>
-            )}
-
           </div>
         </Card>
+
+        {/* ── SECTION 2: Health History Intake ── */}
+        <Card padding="lg" className="animate-fadeUp mb-6">
+          <div className="flex items-center gap-2">
+            <Heart className="text-secondary" size={22} />
+            <h2 className="font-display text-xl text-primary font-bold">Health History</h2>
+          </div>
+          <p className="text-secondary text-sm mt-1">
+            Your background helps our AI generate a more accurate report
+          </p>
+          <div className="border-t border-bgSoft mt-4 mb-6" />
+
+          <div className="space-y-5">
+            {/* Age + Gender row */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {/* Age */}
+              <div>
+                <label className="text-sm font-semibold text-primary mb-1.5 block">
+                  Age <span className="text-danger">*</span>
+                </label>
+                <input
+                  type="number"
+                  min={1} max={120}
+                  value={age}
+                  onChange={(e) => {
+                    setAge(e.target.value);
+                    if (errors.age) setErrors((prev) => ({ ...prev, age: "" }));
+                  }}
+                  placeholder="e.g. 28"
+                  className={`w-full bg-bgLight/60 border rounded-xl px-4 py-3 text-primary text-sm placeholder:text-primary/30 focus:outline-none focus:ring-2 focus:ring-accent transition font-medium ${errors.age ? "border-danger" : "border-bgSoft"}`}
+                />
+                {errors.age && (
+                  <p className="text-danger text-xs mt-1.5 flex items-center gap-1">
+                    <AlertCircle size={12} /> {errors.age}
+                  </p>
+                )}
+              </div>
+
+              {/* Gender */}
+              <div>
+                <label className="text-sm font-semibold text-primary mb-1.5 block">
+                  Gender <span className="text-danger">*</span>
+                </label>
+                <div className="relative">
+                  <select
+                    value={gender}
+                    onChange={(e) => {
+                      setGender(e.target.value);
+                      if (errors.gender) setErrors((prev) => ({ ...prev, gender: "" }));
+                    }}
+                    className={`w-full bg-bgLight/60 border rounded-xl px-4 py-3 text-primary text-sm appearance-none focus:outline-none focus:ring-2 focus:ring-accent transition font-medium ${errors.gender ? "border-danger" : "border-bgSoft"}`}
+                  >
+                    {GENDERS.map(g => <option key={g} value={g}>{g}</option>)}
+                  </select>
+                  <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 text-secondary pointer-events-none" size={18} />
+                </div>
+                {errors.gender && (
+                  <p className="text-danger text-xs mt-1.5 flex items-center gap-1">
+                    <AlertCircle size={12} /> {errors.gender}
+                  </p>
+                )}
+              </div>
+            </div>
+
+            {/* Existing Conditions */}
+            <div>
+              <label className="text-sm font-semibold text-primary mb-2 block">
+                Existing Conditions <span className="text-primary/40 font-normal">(select all that apply)</span>
+              </label>
+              <div className="flex flex-wrap gap-2">
+                {CONDITIONS_OPTIONS.map((cond) => {
+                  const active = selectedConditions.includes(cond);
+                  return (
+                    <button
+                      key={cond}
+                      type="button"
+                      onClick={() => toggleCondition(cond)}
+                      className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition-all duration-200 ${
+                        active
+                          ? "bg-secondary text-white border-secondary"
+                          : "bg-bgSoft border-bgLight text-primary/70 hover:border-secondary hover:text-secondary"
+                      }`}
+                    >
+                      {cond}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Past Surgeries */}
+            <div>
+              <label className="text-sm font-semibold text-primary mb-1.5 block">
+                Past Surgeries
+              </label>
+              <input
+                type="text"
+                value={surgeries}
+                onChange={(e) => setSurgeries(e.target.value)}
+                placeholder="e.g. Appendectomy in 2019, knee surgery in 2021"
+                className="w-full bg-bgLight/60 border border-bgSoft rounded-xl px-4 py-3 text-primary text-sm placeholder:text-primary/30 focus:outline-none focus:ring-2 focus:ring-accent transition font-medium"
+              />
+            </div>
+
+            {/* Allergies */}
+            <div>
+              <label className="text-sm font-semibold text-primary mb-1.5 block">
+                Allergies
+              </label>
+              <input
+                type="text"
+                value={allergies}
+                onChange={(e) => setAllergies(e.target.value)}
+                placeholder="e.g. Penicillin, peanuts, latex"
+                className="w-full bg-bgLight/60 border border-bgSoft rounded-xl px-4 py-3 text-primary text-sm placeholder:text-primary/30 focus:outline-none focus:ring-2 focus:ring-accent transition font-medium"
+              />
+            </div>
+
+            {/* Medications */}
+            <div>
+              <label className="text-sm font-semibold text-primary mb-1.5 block">
+                Current Medications
+              </label>
+              <input
+                type="text"
+                value={medications}
+                onChange={(e) => setMedications(e.target.value)}
+                placeholder="e.g. Metformin 500mg, Lisinopril 10mg"
+                className="w-full bg-bgLight/60 border border-bgSoft rounded-xl px-4 py-3 text-primary text-sm placeholder:text-primary/30 focus:outline-none focus:ring-2 focus:ring-accent transition font-medium"
+              />
+            </div>
+          </div>
+        </Card>
+
+        {/* Disclaimer + Submit */}
+        <div className="mb-6">
+          <div className="bg-primary/5 border border-primary/10 rounded-xl p-4 flex gap-3 items-start mb-6">
+            <Bot className="text-accent shrink-0 mt-0.5" size={18} />
+            <p className="text-xs text-primary/70 leading-relaxed">
+              MediFlow AI will analyze your input using clinical triage protocols. Results are indicative only — always consult a qualified physician.
+            </p>
+          </div>
+
+          {isProcessing ? (
+            <Card padding="md" className="bg-primary border-primary overflow-hidden relative">
+              <div className="absolute inset-0 bg-white/5 animate-pulse" />
+              <div className="relative z-10">
+                <div className="flex items-center justify-center gap-3 mb-4">
+                  <span className="animate-spin border-2 border-white/30 border-t-white rounded-full w-5 h-5" />
+                  <p className="text-white font-semibold text-sm">MediFlow AI is analyzing your symptoms...</p>
+                </div>
+                <div className="w-full h-1.5 bg-white/10 rounded-full overflow-hidden relative">
+                  <div className="absolute top-0 left-0 h-full w-full bg-gradient-to-r from-accent via-white/80 to-accent animate-shimmer" />
+                </div>
+                <p className="text-center text-white/60 text-xs mt-3 font-medium">
+                  Checking clinical protocols · Assessing risk factors · Generating report
+                </p>
+              </div>
+            </Card>
+          ) : (
+            <Button
+              variant="primary"
+              size="lg"
+              className="w-full"
+              disabled={symptoms.trim().length < 10}
+              onClick={handleSubmit}
+            >
+              Analyze My Symptoms →
+            </Button>
+          )}
+        </div>
+
       </PageContainer>
     </>
   );
