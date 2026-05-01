@@ -2,12 +2,10 @@
 
 import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowRight, Activity, CalendarDays, Droplet, Ruler, Weight, Phone, Mail, MapPin } from "lucide-react";
-import { Badge } from "../../../../components/ui/Badge";
-import { DemoNavbar } from "../../../../components/layout/DemoNavbar";
+import { Activity, CalendarDays, Droplet, Ruler, Weight, Phone, Mail, MapPin } from "lucide-react";
 import { PatientSidebar } from "../../../../components/patient/PatientSidebar";
 import HealthChat from "../../../../components/patient/HealthChat";
-import { appointmentsApi, authApi, type Appointment } from "../../../../lib/api";
+import { authApi } from "../../../../lib/api";
 
 interface UserProfile {
   id?: string;
@@ -28,15 +26,10 @@ interface UserProfile {
 export default function PatientDashboardPage() {
   const router = useRouter();
   const [user, setUser] = useState<UserProfile | null>(null);
-  const [appointments, setAppointments] = useState<Appointment[]>([]);
-  const [loadingAppts, setLoadingAppts] = useState(false);
 
   useEffect(() => {
     const token = typeof window !== "undefined" ? localStorage.getItem("mediflow_token") : null;
-    if (!token) {
-      router.replace("/demo/patient/auth");
-      return;
-    }
+    if (!token) { router.replace("/demo/patient/auth"); return; }
 
     authApi.me()
       .then(res => {
@@ -52,208 +45,132 @@ export default function PatientDashboardPage() {
           const cached = localStorage.getItem("mediflow_user");
           if (cached) setUser(JSON.parse(cached));
           else router.replace("/demo/patient/auth");
-        } catch {
-          router.replace("/demo/patient/auth");
-        }
+        } catch { router.replace("/demo/patient/auth"); }
       });
   }, [router]);
 
-  const loadAppointments = async () => {
-    setLoadingAppts(true);
-    try {
-      const res = await appointmentsApi.getAll();
-      setAppointments(res.appointments || []);
-    } catch {
-      try {
-        const stored = localStorage.getItem("mediflow_appointments");
-        if (stored) setAppointments(JSON.parse(stored));
-      } catch { /* ignore */ }
-    } finally {
-      setLoadingAppts(false);
-    }
-  };
-
-  useEffect(() => {
-    if (!user) return;
-    loadAppointments();
-    const onApptUpdate = () => loadAppointments();
-    window.addEventListener("appointmentUpdated", onApptUpdate);
-    return () => window.removeEventListener("appointmentUpdated", onApptUpdate);
-  }, [user]);
-
   if (!user) return null;
 
-  const upcoming = appointments.filter(a => a.status === "upcoming" || a.status === "confirmed").slice(0, 2);
-
   return (
-    <>
-      <DemoNavbar title="Patient Dashboard" />
-      <div className="flex min-h-[calc(100vh-64px)] bg-[#F8FAFC]">
-        <PatientSidebar
-          activeTab="overview"
-          onTabChange={() => {}}
-          patientName={user.name}
-          riskLabel="Active"
-          riskColor="bg-green-100 text-green-700 border-green-200"
-        />
+    <div style={{ display: 'flex', height: '100vh', overflow: 'hidden', background: '#F8FAFC' }}>
+      <PatientSidebar
+        activeTab="overview"
+        onTabChange={() => {}}
+        patientName={user.name}
+        riskLabel="Active"
+        riskColor="bg-green-100 text-green-700 border-green-200"
+      />
 
-        <main className="flex-1 p-6 lg:p-8 overflow-auto">
-          <div className="max-w-[1600px] mx-auto grid grid-cols-1 xl:grid-cols-[1fr_500px] gap-8">
-            
-            {/* ─── LEFT COLUMN: Profile & Details ─── */}
-            <div className="flex flex-col gap-8">
-              
-              {/* Top Row: Quick Vitals Cards */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 animate-fadeUp">
-                <div className="bg-white rounded-2xl p-5 border border-[#E2E8F0] shadow-sm flex items-center gap-4">
-                  <div className="w-12 h-12 rounded-full bg-blue-50 flex items-center justify-center text-blue-600">
-                    <Droplet size={24} />
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        
+        {/* Page Header */}
+        <div style={{ padding: '20px 32px', borderBottom: '1px solid #E2E8F0', background: '#F8FAFC', flexShrink: 0, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div>
+            <p style={{ color: '#64748B', fontSize: '13px', fontWeight: 500, margin: 0 }}>Patient Portal</p>
+            <h2 style={{ color: '#0F172A', fontSize: '22px', fontWeight: 700, margin: '2px 0 0 0' }}>Dashboard</h2>
+          </div>
+          <span style={{ color: '#94A3B8', fontSize: '13px' }}>
+            {new Date().toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+          </span>
+        </div>
+
+        {/* Two-column layout */}
+        <div style={{ flex: 1, display: 'grid', gridTemplateColumns: '1fr 420px', overflow: 'hidden' }}>
+
+          {/* LEFT: Profile & Medical Info — scrollable */}
+          <div style={{ overflowY: 'auto', padding: '28px 32px', borderRight: '1px solid #E2E8F0' }}>
+
+            {/* Vitals Row */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px', marginBottom: '24px' }}>
+              {[
+                { icon: <Droplet size={22} />, bg: '#EFF6FF', color: '#2563EB', label: 'BLOOD GROUP', value: user.bloodGroup || 'O+', unit: '' },
+                { icon: <CalendarDays size={22} />, bg: '#EEF2FF', color: '#4F46E5', label: 'AGE / GENDER', value: `${user.age || '28'} ${user.gender === 'M' ? 'M' : user.gender === 'F' ? 'F' : 'U'}`, unit: '' },
+                { icon: <Ruler size={22} />, bg: '#ECFDF5', color: '#059669', label: 'HEIGHT', value: user.height || '175', unit: 'cm' },
+                { icon: <Weight size={22} />, bg: '#FFF7ED', color: '#EA580C', label: 'WEIGHT', value: user.weight || '70', unit: 'kg' },
+              ].map((v, i) => (
+                <div key={i} style={{ background: '#FFFFFF', borderRadius: '16px', padding: '18px 20px', border: '1px solid #E2E8F0', boxShadow: '0 1px 3px rgba(0,0,0,0.04)', display: 'flex', alignItems: 'center', gap: '14px' }}>
+                  <div style={{ width: '44px', height: '44px', borderRadius: '50%', background: v.bg, color: v.color, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    {v.icon}
                   </div>
                   <div>
-                    <p className="text-[#64748B] text-xs font-bold uppercase tracking-wider">Blood Group</p>
-                    <p className="text-[#0F172A] font-bold text-xl">{user.bloodGroup || "O+"}</p>
+                    <p style={{ color: '#64748B', fontSize: '10px', fontWeight: 700, letterSpacing: '0.5px', margin: '0 0 2px 0' }}>{v.label}</p>
+                    <p style={{ color: '#0F172A', fontSize: '18px', fontWeight: 800, margin: 0 }}>
+                      {v.value} {v.unit && <span style={{ fontSize: '12px', color: '#94A3B8', fontWeight: 500 }}>{v.unit}</span>}
+                    </p>
                   </div>
                 </div>
-                <div className="bg-white rounded-2xl p-5 border border-[#E2E8F0] shadow-sm flex items-center gap-4">
-                  <div className="w-12 h-12 rounded-full bg-indigo-50 flex items-center justify-center text-indigo-600">
-                    <CalendarDays size={24} />
-                  </div>
-                  <div>
-                    <p className="text-[#64748B] text-xs font-bold uppercase tracking-wider">Age / Gender</p>
-                    <p className="text-[#0F172A] font-bold text-xl">{user.age || "28"} {user.gender === 'M' ? 'M' : user.gender === 'F' ? 'F' : 'U'}</p>
-                  </div>
-                </div>
-                <div className="bg-white rounded-2xl p-5 border border-[#E2E8F0] shadow-sm flex items-center gap-4">
-                  <div className="w-12 h-12 rounded-full bg-emerald-50 flex items-center justify-center text-emerald-600">
-                    <Ruler size={24} />
-                  </div>
-                  <div>
-                    <p className="text-[#64748B] text-xs font-bold uppercase tracking-wider">Height</p>
-                    <p className="text-[#0F172A] font-bold text-xl">{user.height || "175"} <span className="text-sm font-medium text-[#64748B]">cm</span></p>
-                  </div>
-                </div>
-                <div className="bg-white rounded-2xl p-5 border border-[#E2E8F0] shadow-sm flex items-center gap-4">
-                  <div className="w-12 h-12 rounded-full bg-orange-50 flex items-center justify-center text-orange-600">
-                    <Weight size={24} />
-                  </div>
-                  <div>
-                    <p className="text-[#64748B] text-xs font-bold uppercase tracking-wider">Weight</p>
-                    <p className="text-[#0F172A] font-bold text-xl">{user.weight || "70"} <span className="text-sm font-medium text-[#64748B]">kg</span></p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Main Profile Info */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-8 animate-fadeUp" style={{ animationDelay: '100ms' }}>
-                
-                {/* Contact & Personal Details */}
-                <div className="bg-white rounded-2xl p-8 border border-[#E2E8F0] shadow-sm flex flex-col">
-                  <h3 className="text-[#0F172A] text-lg font-bold mb-6 flex items-center gap-2">
-                    <Activity className="text-[#1B4965]" /> Personal Information
-                  </h3>
-                  <div className="space-y-6 flex-1">
-                    <div className="flex items-start gap-4">
-                      <Mail className="text-[#94A3B8] mt-1" size={20} />
-                      <div>
-                        <p className="text-[#64748B] text-xs font-bold uppercase tracking-wider">Email Address</p>
-                        <p className="text-[#0F172A] font-medium">{user.email}</p>
-                      </div>
-                    </div>
-                    <div className="flex items-start gap-4">
-                      <Phone className="text-[#94A3B8] mt-1" size={20} />
-                      <div>
-                        <p className="text-[#64748B] text-xs font-bold uppercase tracking-wider">Phone Number</p>
-                        <p className="text-[#0F172A] font-medium">{user.phone || "+1 (555) 000-0000"}</p>
-                      </div>
-                    </div>
-                    <div className="flex items-start gap-4">
-                      <MapPin className="text-[#94A3B8] mt-1" size={20} />
-                      <div>
-                        <p className="text-[#64748B] text-xs font-bold uppercase tracking-wider">Address</p>
-                        <p className="text-[#0F172A] font-medium">{user.address || "123 Medical Drive, Health City, NY 10001"}</p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Medical History */}
-                <div className="bg-white rounded-2xl p-8 border border-[#E2E8F0] shadow-sm flex flex-col">
-                  <h3 className="text-[#0F172A] text-lg font-bold mb-6">Medical History</h3>
-                  <div className="space-y-6 flex-1">
-                    <div>
-                      <p className="text-[#64748B] text-xs font-bold uppercase tracking-wider mb-2">Chronic Conditions</p>
-                      <div className="flex flex-wrap gap-2">
-                        {user.conditions && user.conditions.length > 0 ? (
-                          user.conditions.map(c => (
-                            <span key={c} className="bg-rose-50 text-rose-700 border border-rose-200 px-3 py-1 rounded-full text-sm font-semibold">
-                              {c}
-                            </span>
-                          ))
-                        ) : (
-                          <span className="text-[#64748B] text-sm">None recorded</span>
-                        )}
-                      </div>
-                    </div>
-                    <div>
-                      <p className="text-[#64748B] text-xs font-bold uppercase tracking-wider mb-2">Current Medications</p>
-                      <p className="text-[#0F172A] font-medium bg-[#F8FAFC] p-3 rounded-lg border border-[#E2E8F0]">
-                        {user.medications || "None"}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-[#64748B] text-xs font-bold uppercase tracking-wider mb-2">Known Allergies</p>
-                      <p className="text-[#0F172A] font-medium bg-[#F8FAFC] p-3 rounded-lg border border-[#E2E8F0]">
-                        {user.allergies || "None"}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-              </div>
-
-              {/* Upcoming Appointments */}
-              <div className="bg-white rounded-2xl p-8 border border-[#E2E8F0] shadow-sm animate-fadeUp" style={{ animationDelay: '200ms' }}>
-                <div className="flex justify-between items-center mb-6">
-                  <h3 className="text-[#0F172A] text-lg font-bold">Upcoming Appointments</h3>
-                  <button onClick={() => router.push("/demo/patient/appointments")} className="text-[#1B4965] font-semibold text-sm hover:underline">
-                    View All
-                  </button>
-                </div>
-                
-                {loadingAppts ? (
-                  <p className="text-[#64748B] py-4">Loading...</p>
-                ) : upcoming.length > 0 ? (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {upcoming.map((apt, i) => (
-                      <div key={apt._id || i} className="flex flex-col gap-3 p-4 rounded-xl border border-[#E2E8F0] bg-[#F8FAFC] hover:shadow-md transition-shadow">
-                        <div className="flex justify-between items-start">
-                          <h4 className="font-bold text-[#0F172A] text-lg">{apt.doctorName || "Doctor"}</h4>
-                          <span className="bg-emerald-100 text-emerald-700 text-xs font-bold px-2 py-1 rounded-md">Confirmed</span>
-                        </div>
-                        <p className="text-[#64748B] text-sm">{apt.specialization}</p>
-                        <div className="mt-2 pt-3 border-t border-[#E2E8F0] flex items-center gap-2 text-[#0F172A] font-medium text-sm">
-                          <CalendarDays size={16} className="text-[#94A3B8]" />
-                          {apt.dateTime ? new Date(apt.dateTime).toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }) : "Date TBD"}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="text-center py-8 bg-[#F8FAFC] rounded-xl border border-dashed border-[#CBD5E1]">
-                    <p className="text-[#64748B] font-medium">No upcoming appointments</p>
-                  </div>
-                )}
-              </div>
+              ))}
             </div>
 
-            {/* ─── RIGHT COLUMN: WhatsApp Triage Chat ─── */}
-            <div className="h-[calc(100vh-130px)] flex flex-col bg-white rounded-2xl border border-[#E2E8F0] shadow-lg overflow-hidden animate-fadeUp" style={{ animationDelay: '300ms' }}>
-              <HealthChat />
+            {/* Personal + Medical side by side */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+              
+              {/* Personal Info */}
+              <div style={{ background: '#FFFFFF', borderRadius: '16px', padding: '24px', border: '1px solid #E2E8F0', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
+                <h3 style={{ color: '#0F172A', fontSize: '15px', fontWeight: 700, margin: '0 0 20px 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Activity size={17} color="#1B4965" /> Personal Information
+                </h3>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  {[
+                    { icon: <Mail size={17} />, label: 'EMAIL ADDRESS', value: user.email },
+                    { icon: <Phone size={17} />, label: 'PHONE NUMBER', value: user.phone || '+1 (555) 000-0000' },
+                    { icon: <MapPin size={17} />, label: 'ADDRESS', value: user.address || '123 Medical Drive, Health City, NY 10001' },
+                  ].map((row, i) => (
+                    <div key={i} style={{ display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
+                      <span style={{ color: '#94A3B8', marginTop: '2px', flexShrink: 0 }}>{row.icon}</span>
+                      <div>
+                        <p style={{ color: '#64748B', fontSize: '10px', fontWeight: 700, letterSpacing: '0.5px', margin: '0 0 2px 0' }}>{row.label}</p>
+                        <p style={{ color: '#0F172A', fontSize: '14px', fontWeight: 500, margin: 0 }}>{row.value}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Medical History */}
+              <div style={{ background: '#FFFFFF', borderRadius: '16px', padding: '24px', border: '1px solid #E2E8F0', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
+                <h3 style={{ color: '#0F172A', fontSize: '15px', fontWeight: 700, margin: '0 0 20px 0' }}>Medical History</h3>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  <div>
+                    <p style={{ color: '#64748B', fontSize: '10px', fontWeight: 700, letterSpacing: '0.5px', margin: '0 0 8px 0' }}>CHRONIC CONDITIONS</p>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                      {user.conditions && user.conditions.length > 0
+                        ? user.conditions.map(c => <span key={c} style={{ background: '#FFF1F2', color: '#BE123C', border: '1px solid #FECDD3', padding: '4px 10px', borderRadius: '20px', fontSize: '12px', fontWeight: 600 }}>{c}</span>)
+                        : <span style={{ color: '#64748B', fontSize: '13px' }}>None recorded</span>}
+                    </div>
+                  </div>
+                  <div>
+                    <p style={{ color: '#64748B', fontSize: '10px', fontWeight: 700, letterSpacing: '0.5px', margin: '0 0 6px 0' }}>CURRENT MEDICATIONS</p>
+                    <p style={{ color: '#0F172A', fontSize: '13px', fontWeight: 500, background: '#F8FAFC', padding: '10px 12px', borderRadius: '8px', border: '1px solid #E2E8F0', margin: 0 }}>{user.medications || 'None'}</p>
+                  </div>
+                  <div>
+                    <p style={{ color: '#64748B', fontSize: '10px', fontWeight: 700, letterSpacing: '0.5px', margin: '0 0 6px 0' }}>KNOWN ALLERGIES</p>
+                    <p style={{ color: '#0F172A', fontSize: '13px', fontWeight: 500, background: '#F8FAFC', padding: '10px 12px', borderRadius: '8px', border: '1px solid #E2E8F0', margin: 0 }}>{user.allergies || 'None'}</p>
+                  </div>
+                </div>
+              </div>
             </div>
 
           </div>
-        </main>
+
+          {/* RIGHT: Floating AI Chat Widget */}
+          <div style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden', padding: '16px 20px 16px 12px' }}>
+            <div style={{
+              flex: 1,
+              display: 'flex',
+              flexDirection: 'column',
+              overflow: 'hidden',
+              borderRadius: '20px',
+              border: '1.5px solid #D1D5DB',
+              boxShadow: '0 8px 32px rgba(0,0,0,0.10), 0 2px 8px rgba(27,73,101,0.08)',
+              background: '#FFFFFF',
+            }}>
+              <HealthChat />
+            </div>
+          </div>
+
+        </div>
       </div>
-    </>
+    </div>
   );
 }
