@@ -1,104 +1,328 @@
-const mongoose = require("mongoose");
-const Doctor = require("./models/Doctor");
-require("dotenv").config();
+const mongoose = require('mongoose');
+require('dotenv').config();
 
-mongoose.connect(process.env.MONGODB_URI || "mongodb://localhost:27017/mediflow")
-    .then(async () => {
+const Doctor = require('./models/Doctor');
+
+const doctors = [
+    {
+        name: "Dr. Anil Mehta",
+        specialization: "Cardiologist",
+        email: "anil.mehta@mediflow.ai",
+        phone: "9876543201",
+        qualification: "MBBS, DM Cardiology",
+        experience: 15,
+        department: "Cardiology",
+        consultationFee: 1000,
+        rating: 4.9,
+        isAvailable: true,
+        bio: "Senior cardiologist with 15 years experience",
+        totalPatients: 120,
+    },
+    {
+        name: "Dr. Vinod Kumar",
+        specialization: "Neurologist",
+        email: "vinod.kumar@mediflow.ai",
+        phone: "9876543202",
+        qualification: "MBBS, DM Neurology",
+        experience: 12,
+        department: "Neurology",
+        consultationFee: 900,
+        rating: 4.7,
+        isAvailable: true,
+        bio: "Expert neurologist specializing in brain disorders",
+        totalPatients: 95,
+    },
+    {
+        name: "Dr. Sarah Khan",
+        specialization: "General Physician",
+        email: "sarah.khan@mediflow.ai",
+        phone: "9876543203",
+        qualification: "MBBS, MD",
+        experience: 8,
+        department: "General",
+        consultationFee: 500,
+        rating: 4.5,
+        isAvailable: true,
+        bio: "General physician for routine checkups",
+        totalPatients: 200,
+    },
+    {
+        name: "Dr. Priya Singh",
+        specialization: "Dermatologist",
+        email: "priya.singh@mediflow.ai",
+        phone: "9876543204",
+        qualification: "MBBS, MD Dermatology",
+        experience: 7,
+        department: "Dermatology",
+        consultationFee: 700,
+        rating: 4.6,
+        isAvailable: true,
+        bio: "Skin specialist with expertise in cosmetic dermatology",
+        totalPatients: 80,
+    },
+    {
+        name: "Dr. Ramesh Gupta",
+        specialization: "Pulmonologist",
+        email: "ramesh.gupta@mediflow.ai",
+        phone: "9876543205",
+        qualification: "MBBS, MD Pulmonology",
+        experience: 11,
+        department: "Pulmonology",
+        consultationFee: 850,
+        rating: 4.7,
+        isAvailable: true,
+        bio: "Lung specialist treating respiratory conditions",
+        totalPatients: 75,
+    },
+    {
+        name: "Dr. Suresh Patel",
+        specialization: "Orthopedic",
+        email: "suresh.patel@mediflow.ai",
+        phone: "9876543206",
+        qualification: "MBBS, MS Orthopedics",
+        experience: 13,
+        department: "Orthopedics",
+        consultationFee: 900,
+        rating: 4.8,
+        isAvailable: true,
+        bio: "Bone and joint specialist",
+        totalPatients: 110,
+    },
+    {
+        name: "Dr. Meera Joshi",
+        specialization: "Gynecologist",
+        email: "meera.joshi@mediflow.ai",
+        phone: "9876543207",
+        qualification: "MBBS, MD Gynecology",
+        experience: 10,
+        department: "Gynecology",
+        consultationFee: 800,
+        rating: 4.8,
+        isAvailable: true,
+        bio: "Women health specialist",
+        totalPatients: 150,
+    },
+    {
+        name: "Dr. Rajiv Sharma",
+        specialization: "Pediatrician",
+        email: "rajiv.sharma@mediflow.ai",
+        phone: "9876543208",
+        qualification: "MBBS, MD Pediatrics",
+        experience: 9,
+        department: "Pediatrics",
+        consultationFee: 600,
+        rating: 4.9,
+        isAvailable: true,
+        bio: "Child specialist with gentle approach",
+        totalPatients: 180,
+    },
+    {
+        name: "Dr. Anjali Verma",
+        specialization: "Psychiatrist",
+        email: "anjali.verma@mediflow.ai",
+        phone: "9876543209",
+        qualification: "MBBS, MD Psychiatry",
+        experience: 6,
+        department: "Psychiatry",
+        consultationFee: 1000,
+        rating: 4.6,
+        isAvailable: true,
+        bio: "Mental health specialist",
+        totalPatients: 60,
+    },
+    {
+        name: "Dr. Kiran Reddy",
+        specialization: "Ophthalmologist",
+        email: "kiran.reddy@mediflow.ai",
+        phone: "9876543210",
+        qualification: "MBBS, MS Ophthalmology",
+        experience: 14,
+        department: "Ophthalmology",
+        consultationFee: 750,
+        rating: 4.7,
+        isAvailable: true,
+        bio: "Eye specialist and surgeon",
+        totalPatients: 130,
+    },
+    {
+        name: "Dr. Mohan Singh",
+        specialization: "Neurologist",
+        email: "mohan.singh@mediflow.ai",
+        phone: "9856452379",
+        qualification: "MBBS",
+        experience: 5,
+        department: "Neurology",
+        consultationFee: 499,
+        rating: 4.5,
+        isAvailable: true,
+        bio: "Neurologist specializing in spine disorders",
+        totalPatients: 15,
+    },
+    {
+        name: "Dr. Sunita Rao",
+        specialization: "Endocrinologist",
+        email: "sunita.rao@mediflow.ai",
+        phone: "9876543211",
+        qualification: "MBBS, DM Endocrinology",
+        experience: 10,
+        department: "Endocrinology",
+        consultationFee: 900,
+        rating: 4.8,
+        isAvailable: true,
+        bio: "Diabetes and thyroid specialist",
+        totalPatients: 90,
+    },
+    {
+        name: "Dr. Amit Chauhan",
+        specialization: "Urologist",
+        email: "amit.chauhan@mediflow.ai",
+        phone: "9876543212",
+        qualification: "MBBS, MS Urology",
+        experience: 11,
+        department: "Urology",
+        consultationFee: 850,
+        rating: 4.6,
+        isAvailable: true,
+        bio: "Kidney and urinary tract specialist",
+        totalPatients: 70,
+    },
+    {
+        name: "Dr. Pooja Nair",
+        specialization: "Oncologist",
+        email: "pooja.nair@mediflow.ai",
+        phone: "9876543213",
+        qualification: "MBBS, DM Oncology",
+        experience: 13,
+        department: "Oncology",
+        consultationFee: 1200,
+        rating: 4.9,
+        isAvailable: true,
+        bio: "Cancer specialist with compassionate care",
+        totalPatients: 55,
+    },
+    {
+        name: "Dr. Vikram Malhotra",
+        specialization: "Gastroenterologist",
+        email: "vikram.malhotra@mediflow.ai",
+        phone: "9876543214",
+        qualification: "MBBS, DM Gastroenterology",
+        experience: 9,
+        department: "Gastroenterology",
+        consultationFee: 950,
+        rating: 4.7,
+        isAvailable: true,
+        bio: "Digestive system specialist",
+        totalPatients: 85,
+    },
+    {
+        name: "Dr. Neha Kapoor",
+        specialization: "Rheumatologist",
+        email: "neha.kapoor@mediflow.ai",
+        phone: "9876543215",
+        qualification: "MBBS, MD Rheumatology",
+        experience: 8,
+        department: "Rheumatology",
+        consultationFee: 800,
+        rating: 4.6,
+        isAvailable: false,
+        bio: "Arthritis and autoimmune specialist",
+        totalPatients: 65,
+    },
+    {
+        name: "Dr. Sanjay Dubey",
+        specialization: "Nephrologist",
+        email: "sanjay.dubey@mediflow.ai",
+        phone: "9876543216",
+        qualification: "MBBS, DM Nephrology",
+        experience: 12,
+        department: "Nephrology",
+        consultationFee: 1000,
+        rating: 4.8,
+        isAvailable: true,
+        bio: "Kidney disease specialist",
+        totalPatients: 78,
+    },
+    {
+        name: "Dr. Deepa Menon",
+        specialization: "Cardiologist",
+        email: "deepa.menon@mediflow.ai",
+        phone: "9876543217",
+        qualification: "MBBS, DM Cardiology",
+        experience: 16,
+        department: "Cardiology",
+        consultationFee: 1100,
+        rating: 4.9,
+        isAvailable: true,
+        bio: "Interventional cardiologist",
+        totalPatients: 140,
+    },
+    {
+        name: "Dr. Rohit Saxena",
+        specialization: "General Physician",
+        email: "rohit.saxena@mediflow.ai",
+        phone: "9876543218",
+        qualification: "MBBS, MD",
+        experience: 6,
+        department: "General",
+        consultationFee: 400,
+        rating: 4.4,
+        isAvailable: true,
+        bio: "General medicine and preventive care",
+        totalPatients: 160,
+    },
+    {
+        name: "Dr. Kavita Pillai",
+        specialization: "Dermatologist",
+        email: "kavita.pillai@mediflow.ai",
+        phone: "9876543219",
+        qualification: "MBBS, MD Dermatology",
+        experience: 9,
+        department: "Dermatology",
+        consultationFee: 750,
+        rating: 4.7,
+        isAvailable: false,
+        bio: "Hair and skin specialist",
+        totalPatients: 95,
+    },
+];
+
+const seedDoctors = async () => {
+    try {
+        await mongoose.connect(process.env.MONGO_URI);
+        console.log('✅ MongoDB connected');
+
+        // Clear existing doctors
         await Doctor.deleteMany({});
-        await Doctor.insertMany([
-            {
-                name: "Dr. Priya Sharma",
-                specialization: "general",
-                email: "priya.sharma@mediflow.com",
-                phone: "9876543210",
-                qualification: "MBBS, MD",
-                experience: 8,
-                department: "General Medicine",
-                isAvailable: true,
-                consultationFee: 500,
-                rating: 4.8,
-                bio: "Expert in general medicine and preventive care."
-            },
-            {
-                name: "Dr. Rahul Gupta",
-                specialization: "general",
-                email: "rahul.gupta@mediflow.com",
-                phone: "9876543211",
-                qualification: "MBBS",
-                experience: 5,
-                department: "General Medicine",
-                isAvailable: true,
-                consultationFee: 400,
-                rating: 4.6,
-                bio: "Experienced general physician."
-            },
-            {
-                name: "Dr. Sneha Verma",
-                specialization: "cardiologist",
-                email: "sneha.verma@mediflow.com",
-                phone: "9876543212",
-                qualification: "MBBS, DM Cardiology",
-                experience: 12,
-                department: "Cardiology",
-                isAvailable: true,
-                consultationFee: 800,
-                rating: 4.9,
-                bio: "Senior cardiologist with 12 years experience."
-            },
-            {
-                name: "Dr. Amit Singh",
-                specialization: "neurologist",
-                email: "amit.singh@mediflow.com",
-                phone: "9876543213",
-                qualification: "MBBS, DM Neurology",
-                experience: 10,
-                department: "Neurology",
-                isAvailable: true,
-                consultationFee: 700,
-                rating: 4.7,
-                bio: "Specialist in neurological disorders."
-            },
-            {
-                name: "Dr. Kavya Patel",
-                specialization: "pulmonologist",
-                email: "kavya.patel@mediflow.com",
-                phone: "9876543214",
-                qualification: "MBBS, MD Pulmonology",
-                experience: 7,
-                department: "Pulmonology",
-                isAvailable: true,
-                consultationFee: 600,
-                rating: 4.5,
-                bio: "Expert in respiratory and lung diseases."
-            },
-            {
-                name: "Dr. Rohan Mehta",
-                specialization: "dermatologist",
-                email: "rohan.mehta@mediflow.com",
-                phone: "9876543215",
-                qualification: "MBBS, MD Dermatology",
-                experience: 6,
-                department: "Dermatology",
-                isAvailable: true,
-                consultationFee: 550,
-                rating: 4.6,
-                bio: "Specialist in skin conditions."
-            },
-            {
-                name: "Dr. Anita Joshi",
-                specialization: "orthopedic",
-                email: "anita.joshi@mediflow.com",
-                phone: "9876543216",
-                qualification: "MBBS, MS Orthopedics",
-                experience: 9,
-                department: "Orthopedics",
-                isAvailable: true,
-                consultationFee: 650,
-                rating: 4.7,
-                bio: "Expert in bone and joint disorders."
-            }
-        ]);
-        console.log("✅ Doctors seeded!");
+        console.log('🗑️  Cleared existing doctors');
+
+        let created = 0;
+
+        for (const doc of doctors) {
+            // Create Doctor directly with password
+            // The Doctor model's pre-save hook will hash the password
+            await Doctor.create({
+                ...doc,
+                password: '123456',
+                availableDays: [
+                    'Monday', 'Tuesday', 'Wednesday',
+                    'Thursday', 'Friday'
+                ],
+                availableTimeFrom: '09:00',
+                availableTimeTo: '17:00',
+                isActive: true,
+            });
+
+            console.log(`✅ Created ${doc.name} (${doc.email})`);
+            created++;
+        }
+
+        console.log(`\n🎉 Done! Created ${created} doctors.`);
+        console.log('📧 Login with any doctor email + password: 123456');
         process.exit(0);
-    })
-    .catch(err => { console.error("❌", err); process.exit(1); });
+    } catch (error) {
+        console.error('❌ Error:', error.message);
+        process.exit(1);
+    }
+};
+
+seedDoctors();
