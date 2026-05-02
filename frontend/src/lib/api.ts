@@ -197,6 +197,18 @@ export const authApi = {
     allergies?: string;
   }) => post<AuthResponse>("/api/auth/register", data),
 
+  registerDoctor: (data: {
+    name: string;
+    email: string;
+    password: string;
+    phone: string;
+    specialization: string;
+    qualification?: string;
+    experience?: number;
+    department?: string;
+    consultationFee?: number;
+  }) => post<AuthResponse>("/api/auth/register-doctor", data),
+
   login: (data: { email: string; password: string }) =>
     post<AuthResponse>("/api/auth/login", data),
 
