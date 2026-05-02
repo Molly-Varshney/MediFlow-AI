@@ -3,6 +3,16 @@ const bcrypt = require('bcryptjs');
 
 const DoctorSchema = new mongoose.Schema(
   {
+    // ── Auth & Identity ───────────────────────────────────────────
+    doctorId: {
+      type: String,
+      unique: true,
+      sparse: true,
+    },
+    role: {
+      type: String,
+      default: 'doctor',
+    },
     name: {
       type: String,
       required: [true, 'Doctor name is required'],
@@ -89,11 +99,19 @@ const DoctorSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-// Hash password before saving
+// Hash password & Auto-generate doctorId before saving
 DoctorSchema.pre('save', async function () {
-  if (!this.isModified('password')) return;
-  const salt = await bcrypt.genSalt(10);
-  this.password = await bcrypt.hash(this.password, salt);
+  // Hash password if modified
+  if (this.isModified('password')) {
+    const salt = await bcrypt.genSalt(10);
+    this.password = await bcrypt.hash(this.password, salt);
+  }
+
+  // Auto-generate doctorId
+  if (!this.doctorId) {
+    const count = await mongoose.model('Doctor').countDocuments();
+    this.doctorId = `D-${String(count + 1).padStart(3, '0')}`;
+  }
 });
 
 // Method to compare passwords

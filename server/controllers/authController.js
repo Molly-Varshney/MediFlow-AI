@@ -33,9 +33,10 @@ const formatPatient = (p) => ({
 // Helper: format doctor response
 const formatDoctor = (d) => ({
   id:              d._id,
+  doctorId:        d.doctorId,
   name:            d.name,
   email:           d.email,
-  role:            'doctor',
+  role:            d.role || 'doctor',
   specialization:  d.specialization,
   phone:           d.phone,
   qualification:   d.qualification,

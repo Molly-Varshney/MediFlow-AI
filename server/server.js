@@ -23,19 +23,8 @@ const app = express();
 
 // ── Middleware ─────────────────────────────────────
 // CORS — allow requests from frontend
-const allowedOrigins = (process.env.CLIENT_URL || 'http://localhost:3000')
-  .split(',')
-  .map((o) => o.trim());
-
 app.use(cors({
-  origin: (origin, callback) => {
-    // allow server-to-server calls (no origin) or listed origins
-    if (!origin || allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      callback(new Error(`CORS blocked: ${origin}`));
-    }
-  },
+  origin: true, // Allow all origins for local development
   credentials: true,
 }));
 
