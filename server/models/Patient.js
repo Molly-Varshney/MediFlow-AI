@@ -1,79 +1,69 @@
 const mongoose = require('mongoose');
+const bcrypt = require('bcryptjs');
 
 const PatientSchema = new mongoose.Schema(
   {
+    // ── Auth fields ───────────────────────────────────────────────
+    email: {
+      type: String,
+      required: [true, 'Email is required'],
+      unique: true,
+      lowercase: true,
+      trim: true,
+      match: [/^\S+@\S+\.\S+$/, 'Please enter a valid email'],
+    },
+    password: {
+      type: String,
+      required: [true, 'Password is required'],
+      minlength: [6, 'Password must be at least 6 characters'],
+      select: false,
+    },
+    role: {
+      type: String,
+      default: 'patient',
+    },
+
+    // ── Personal info ─────────────────────────────────────────────
     patientId: {
       type: String,
       unique: true,
+      sparse: true,
     },
     name: {
       type: String,
       required: [true, 'Patient name is required'],
       trim: true,
     },
-    age: {
-      type: Number,
-      required: [true, 'Age is required'],
-      min: 0,
-      max: 150,
-    },
-    gender: {
-      type: String,
-      enum: ['Male', 'Female', 'Other'],
-      required: true,
-    },
-    phone: {
-      type: String,
-      required: [true, 'Phone number is required'],
-    },
-    email: {
-      type: String,
-      lowercase: true,
-      trim: true,
-      default: '',
-    },
-    address: {
-      type: String,
-      default: '',
-    },
-    bloodGroup: {
-      type: String,
-      enum: ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-', ''],
-      default: '',
-    },
-    allergies: {
-      type: [String],
-      default: [],
-    },
-    // Current condition / diagnosis
-    condition: {
-      type: String,
-      default: '',
-    },
-    // Triage priority
+    age:        { type: String, default: '' },
+    gender:     { type: String, default: '' },
+    phone:      { type: String, default: '' },
+    address:    { type: String, default: '' },
+    bloodGroup: { type: String, default: '' },
+
+    // ── Health profile ────────────────────────────────────────────
+    height:     { type: String, default: '' },
+    weight:     { type: String, default: '' },
+    conditions: { type: [String], default: [] },
+    medications:{ type: String, default: '' },
+    allergies:  { type: String, default: '' },
+
+    // ── Clinical fields (set by doctors) ──────────────────────────
+    condition:    { type: String, default: '' },
+    medicalHistory:{ type: String, default: '' },
     priority: {
       type: String,
       enum: ['emergency', 'warning', 'success'],
       default: 'success',
     },
-    // Current status
     status: {
       type: String,
-      enum: ['Critical', 'Stable', 'Recovering', 'Monitored', 'Surgery', 'Discharged', 'Admitted'],
       default: 'Stable',
     },
-    // Assigned doctor
     assignedDoctor: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Doctor',
       default: null,
     },
-    // Medical history summary
-    medicalHistory: {
-      type: String,
-      default: '',
-    },
-    // Vitals (latest)
     vitals: {
       bloodPressure: { type: String, default: '' },
       heartRate:     { type: Number, default: null },
@@ -89,10 +79,22 @@ const PatientSchema = new mongoose.Schema(
 
 // Auto-generate patientId before saving
 PatientSchema.pre('save', async function () {
+  // Hash password if modified
+  if (this.isModified('password')) {
+    const salt = await bcrypt.genSalt(10);
+    this.password = await bcrypt.hash(this.password, salt);
+  }
+
+  // Auto-generate patientId
   if (!this.patientId) {
     const count = await mongoose.model('Patient').countDocuments();
     this.patientId = `P-${String(count + 1).padStart(3, '0')}`;
   }
 });
+
+// Compare password
+PatientSchema.methods.matchPassword = async function (enteredPassword) {
+  return await bcrypt.compare(enteredPassword, this.password);
+};
 
 module.exports = mongoose.model('Patient', PatientSchema);

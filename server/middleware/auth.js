@@ -1,11 +1,10 @@
 const jwt = require('jsonwebtoken');
-const User = require('../models/User');
+const Patient = require('../models/Patient');
 
 // Protect routes — verify JWT token
 const protect = async (req, res, next) => {
   let token;
 
-  // Get token from Authorization header
   if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
     token = req.headers.authorization.split(' ')[1];
   }
@@ -18,19 +17,28 @@ const protect = async (req, res, next) => {
   }
 
   try {
-    // Verify token
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-    // Get user from DB (exclude password)
-    req.user = await User.findById(decoded.id).select('-password');
+    // Check patients collection first (patient portal users)
+    let user = await Patient.findById(decoded.id).select('-password');
 
-    if (!req.user || !req.user.isActive) {
+    // Fall back to Doctor
+    if (!user) {
+      const Doctor = require('../models/Doctor');
+      user = await Doctor.findById(decoded.id).select('-password');
+      if (user) {
+        user.role = 'doctor'; // Doctors act as 'doctor' role
+      }
+    }
+
+    if (!user || !user.isActive) {
       return res.status(401).json({
         success: false,
         message: 'User not found or account deactivated.',
       });
     }
 
+    req.user = user;
     next();
   } catch (error) {
     return res.status(401).json({
@@ -43,10 +51,11 @@ const protect = async (req, res, next) => {
 // Role-based authorization
 const authorize = (...roles) => {
   return (req, res, next) => {
-    if (!roles.includes(req.user.role)) {
+    const userRole = req.user.role || 'patient';
+    if (!roles.includes(userRole)) {
       return res.status(403).json({
         success: false,
-        message: `Role '${req.user.role}' is not authorized for this action.`,
+        message: `Role '${userRole}' is not authorized for this action.`,
       });
     }
     next();
