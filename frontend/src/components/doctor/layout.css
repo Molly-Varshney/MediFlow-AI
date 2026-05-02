@@ -150,6 +150,14 @@
   width: 240px;
   transition: border-color 0.2s;
 }
+@media (max-width: 768px) {
+  .search-bar {
+    width: auto;
+    flex: 1;
+    min-width: 0;
+    padding: 8px 12px;
+  }
+}
 .search-bar:focus-within { border-color: var(--secondary); }
 .search-bar input {
   background: transparent;
@@ -195,4 +203,9 @@
   display: flex;
   flex-direction: column;
   gap: 24px;
+}
+@media (max-width: 768px) {
+  .topbar { padding: 0 16px; gap: 8px; }
+  .topbar-left { display: none; } /* Hide title on very small screens to fit search */
+  .main-content { padding: 16px; }
 }

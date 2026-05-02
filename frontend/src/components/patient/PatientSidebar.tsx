@@ -65,7 +65,7 @@ export function PatientSidebar({ activeTab, onTabChange, patientName, riskLabel,
   };
 
   return (
-    <aside className="w-64 shrink-0 bg-white border-r border-bgSoft flex flex-col min-h-screen sticky top-0">
+    <aside className="w-full md:w-64 shrink-0 bg-white border-r border-bgSoft flex flex-col md:h-screen sticky top-0 z-10">
 
       {/* MediFlow AI Brand Logo */}
       <div className="px-6 py-5 border-b border-bgSoft">

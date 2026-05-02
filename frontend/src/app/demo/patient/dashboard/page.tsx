@@ -53,7 +53,7 @@ export default function PatientDashboardPage() {
   if (!user) return null;
 
   return (
-    <div style={{ display: 'flex', height: '100vh', overflow: 'hidden', background: '#F8FAFC' }}>
+    <div className="flex flex-col md:flex-row h-screen bg-slate-50 overflow-hidden">
       <PatientSidebar
         activeTab="overview"
         onTabChange={() => {}}
@@ -62,10 +62,10 @@ export default function PatientDashboardPage() {
         riskColor="bg-green-100 text-green-700 border-green-200"
       />
 
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+      <div className="flex-1 flex flex-col overflow-hidden">
         
         {/* Page Header */}
-        <div style={{ padding: '20px 32px', borderBottom: '1px solid #E2E8F0', background: '#F8FAFC', flexShrink: 0, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div className="px-4 md:px-8 py-4 md:py-5 border-b border-slate-200 bg-slate-50 shrink-0 flex justify-between items-center">
           <div>
             <p style={{ color: '#64748B', fontSize: '13px', fontWeight: 500, margin: 0 }}>Patient Portal</p>
             <h2 style={{ color: '#0F172A', fontSize: '22px', fontWeight: 700, margin: '2px 0 0 0' }}>Dashboard</h2>
@@ -76,13 +76,13 @@ export default function PatientDashboardPage() {
         </div>
 
         {/* Two-column layout */}
-        <div style={{ flex: 1, display: 'grid', gridTemplateColumns: '1fr 420px', overflow: 'hidden' }}>
+        <div className="flex-1 flex flex-col xl:flex-row overflow-y-auto xl:overflow-hidden">
 
           {/* LEFT: Profile & Medical Info — scrollable */}
-          <div style={{ overflowY: 'auto', padding: '28px 32px', borderRight: '1px solid #E2E8F0' }}>
+          <div className="flex-1 xl:overflow-y-auto p-4 md:p-8 xl:border-r border-slate-200">
 
             {/* Vitals Row */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px', marginBottom: '24px' }}>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
               {[
                 { icon: <Droplet size={22} />, bg: '#EFF6FF', color: '#2563EB', label: 'BLOOD GROUP', value: user.bloodGroup || 'O+', unit: '' },
                 { icon: <CalendarDays size={22} />, bg: '#EEF2FF', color: '#4F46E5', label: 'AGE / GENDER', value: `${user.age || '28'} ${user.gender === 'M' ? 'M' : user.gender === 'F' ? 'F' : 'U'}`, unit: '' },
@@ -104,7 +104,7 @@ export default function PatientDashboardPage() {
             </div>
 
             {/* Personal + Medical side by side */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
               
               {/* Personal Info */}
               <div style={{ background: '#FFFFFF', borderRadius: '16px', padding: '24px', border: '1px solid #E2E8F0', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
@@ -158,7 +158,7 @@ export default function PatientDashboardPage() {
           </div>
 
           {/* RIGHT: Floating AI Chat Widget */}
-          <div style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden', padding: '16px 20px 16px 12px' }}>
+          <div className="w-full xl:w-[420px] shrink-0 p-4 xl:p-4 xl:pl-3 flex flex-col min-h-[500px]">
             <div style={{
               flex: 1,
               display: 'flex',
