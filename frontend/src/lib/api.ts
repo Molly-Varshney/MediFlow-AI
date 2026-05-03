@@ -289,3 +289,15 @@ export const promptsApi = {
   getAll:  ()                                    => get<{ success: boolean; prompts: Prompt[] }>("/api/prompts"),
   update:  (id: string, content: string)         => put<{ success: boolean; prompt: Prompt }>(`/api/prompts/${id}`, { content }),
 };
+
+// ── HEALTH HISTORY ────────────────────────────────────────────────────────────
+
+export const healthHistoryApi = {
+  getAll: (patientId: string) =>
+    get<{ success: boolean; data: any[] }>(`/api/health-history?patientId=${patientId}`),
+  create: (data: any) =>
+    post<{ success: boolean; data: any }>("/api/health-history", data),
+  update: (id: string, data: any) =>
+    put<{ success: boolean; data: any }>(`/api/health-history/${id}`, data),
+};
+

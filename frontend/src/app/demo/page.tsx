@@ -26,7 +26,6 @@ export default function DemoRoleSelection() {
 
   return (
     <>
-      <DemoNavbar title="Role Selection" />
       <PageContainer maxWidth="lg" className="flex flex-col items-center py-16 animate-fadeUp">
         <div className="text-center">
           <p className="text-accent font-semibold text-xs tracking-widest uppercase">
